@@ -1,3 +1,13 @@
+const fs = require("fs");
+
+// reset session jika perlu
+if (process.env.RESET_SESSION === "true") {
+    if (fs.existsSync("./session")) {
+        fs.rmSync("./session", { recursive: true, force: true });
+        console.log("Session lama dihapus");
+    }
+}
+
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const QRCode = require("qrcode");
@@ -5,7 +15,7 @@ const QRCode = require("qrcode");
 const app = express();
 app.use(express.json());
 
-const API_TOKEN = "usatb17"; // contoh: lambaro123
+const API_TOKEN = "usatb17"; // ganti bebas sesuai keinginan
 
 console.log("Memulai WhatsApp bot...");
 
@@ -30,14 +40,15 @@ let latestQR = null;
 let isReady = false;
 
 
-// QR → LINK
+// QR event
 client.on("qr", async (qr) => {
 
     latestQR = await QRCode.toDataURL(qr);
 
-    console.log("\nSCAN QR LINK INI:");
+    console.log("\n======================");
+    console.log("BUKA LINK INI:");
     console.log(latestQR);
-    console.log("");
+    console.log("======================");
 
 });
 
@@ -46,7 +57,16 @@ client.on("qr", async (qr) => {
 client.on("ready", () => {
 
     isReady = true;
-    console.log("✅ BOT SIAP");
+    console.log("✅ BOT SIAP DAN TERHUBUNG");
+
+});
+
+
+// DISCONNECT
+client.on("disconnected", () => {
+
+    isReady = false;
+    console.log("WA terputus");
 
 });
 
