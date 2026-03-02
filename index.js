@@ -1,6 +1,7 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
+const qrcode = require("qrcode-terminal");
 
-const phoneNumber = "6288901808073"; // wajib pakai tanda kutip buka & tutup
+console.log("Memulai bot...");
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -17,32 +18,21 @@ const client = new Client({
     }
 });
 
+client.on("qr", (qr) => {
+    console.log("SCAN QR INI:");
+    qrcode.generate(qr, { small: true });
+});
+
 client.on("ready", () => {
-    console.log("✅ Bot siap!");
+    console.log("BOT SIAP DAN TERHUBUNG");
 });
 
 client.on("authenticated", () => {
-    console.log("✅ Login berhasil");
+    console.log("LOGIN BERHASIL");
 });
 
 client.on("auth_failure", msg => {
-    console.log("❌ Auth gagal:", msg);
+    console.log("LOGIN GAGAL:", msg);
 });
 
-console.log("Memulai bot...");
 client.initialize();
-
-setTimeout(async () => {
-    try {
-        console.log("Meminta pairing code...");
-        const code = await client.requestPairingCode(phoneNumber);
-
-        console.log("\n==============================");
-        console.log("PAIRING CODE ANDA:");
-        console.log(code);
-        console.log("==============================\n");
-
-    } catch (err) {
-        console.log("❌ Error pairing:", err.message);
-    }
-}, 15000);
