@@ -1,5 +1,7 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
 
+const phoneNumber = "628XXXXXXXXXX"; // GANTI nomor kamu
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -13,35 +15,25 @@ const client = new Client({
     }
 });
 
-// pairing code TANPA QR
-client.on("qr", async () => {
-    const phoneNumber = "628XXXXXXXXXX"; // ganti dengan nomor WhatsApp kamu
-    try {
-        const code = await client.requestPairingCode(phoneNumber);
-        console.log("================================");
-        console.log("PAIRING CODE WHATSAPP:");
-        console.log(code);
-        console.log("================================");
-        console.log("Buka WhatsApp > Linked devices > Link with phone number");
-    } catch (err) {
-        console.error("Gagal buat pairing code:", err);
-    }
+client.on("loading_screen", () => {
+    console.log("Loading WhatsApp...");
 });
 
 client.on("ready", () => {
-    console.log("✅ Bot siap dan terhubung!");
-});
-
-client.on("authenticated", () => {
-    console.log("✅ Berhasil login WhatsApp");
-});
-
-client.on("auth_failure", msg => {
-    console.error("❌ Auth gagal:", msg);
-});
-
-client.on("disconnected", reason => {
-    console.log("⚠️ WhatsApp terputus:", reason);
+    console.log("✅ Bot siap!");
 });
 
 client.initialize();
+
+// paksa pairing code setelah start
+setTimeout(async () => {
+    try {
+        const code = await client.requestPairingCode(phoneNumber);
+        console.log("\n===============================");
+        console.log("PAIRING CODE:");
+        console.log(code);
+        console.log("===============================\n");
+    } catch (e) {
+        console.log("Sudah login / gagal:", e.message);
+    }
+}, 5000);
