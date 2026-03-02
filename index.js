@@ -1,5 +1,15 @@
-console.log("WhatsApp bot running on Railway");
+const { Client } = require("whatsapp-web.js");
+const qrcode = require("qrcode-terminal");
 
-setInterval(() => {
-  console.log("Bot alive:", new Date().toLocaleTimeString());
-}, 10000);
+const client = new Client();
+
+client.on("qr", (qr) => {
+    console.log("Scan QR ini:");
+    qrcode.generate(qr, { small: true });
+});
+
+client.on("ready", () => {
+    console.log("Bot siap!");
+});
+
+client.initialize();
