@@ -1,43 +1,122 @@
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
+const QRCode = require("qrcode");
 
 const app = express();
+app.use(express.json());
 
-const TOKEN = "usatb17";
+const API_TOKEN = "usatb17"; // contoh: lambaro123
+
+console.log("Memulai WhatsApp bot...");
 
 const client = new Client({
-    authStrategy: new LocalAuth(),
+    authStrategy: new LocalAuth({
+        dataPath: "./session"
+    }),
     puppeteer: {
-        headless:true,
-        args:["--no-sandbox"]
+        headless: true,
+        args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--single-process",
+            "--no-zygote"
+        ]
     }
 });
 
-client.on("ready", ()=>{
+let latestQR = null;
+let isReady = false;
 
-    console.log("BOT READY");
+
+// QR → LINK
+client.on("qr", async (qr) => {
+
+    latestQR = await QRCode.toDataURL(qr);
+
+    console.log("\nSCAN QR LINK INI:");
+    console.log(latestQR);
+    console.log("");
 
 });
 
 
-app.get("/send", async (req,res)=>{
+// READY
+client.on("ready", () => {
 
-    if(req.query.token !== TOKEN){
+    isReady = true;
+    console.log("✅ BOT SIAP");
 
-        return res.send("token salah");
+});
+
+
+// STATUS API
+app.get("/", (req, res) => {
+
+    res.json({
+        status: isReady ? "connected" : "not_connected",
+        qr: latestQR
+    });
+
+});
+
+
+// SEND MESSAGE API
+app.get("/send", async (req, res) => {
+
+    const token = req.query.token;
+    const number = req.query.to;
+    const message = req.query.msg;
+
+    if (token !== API_TOKEN) {
+
+        return res.json({
+            status: false,
+            message: "Token salah"
+        });
 
     }
 
-    await client.sendMessage(
-        req.query.to+"@c.us",
-        req.query.msg
-    );
+    if (!isReady) {
 
-    res.send("ok");
+        return res.json({
+            status: false,
+            message: "WhatsApp belum login"
+        });
+
+    }
+
+    try {
+
+        const chatId = number + "@c.us";
+
+        await client.sendMessage(chatId, message);
+
+        res.json({
+            status: true,
+            message: "Pesan terkirim"
+        });
+
+    } catch (err) {
+
+        res.json({
+            status: false,
+            error: err.message
+        });
+
+    }
 
 });
 
 
-app.listen(3000);
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+
+    console.log("API jalan di port", PORT);
+
+});
+
 
 client.initialize();
