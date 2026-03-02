@@ -3,7 +3,6 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 const QRCode = require("qrcode");
 
 const app = express();
-app.use(express.json());
 
 const API_TOKEN = "medanusatb17";
 
@@ -18,31 +17,31 @@ const client = new Client({
     }),
     puppeteer: {
         headless: true,
+        executablePath: "/usr/bin/chromium-browser",
         args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
             "--disable-gpu",
-            "--single-process",
-            "--no-zygote"
+            "--no-first-run",
+            "--no-zygote",
+            "--single-process"
         ]
     }
 });
 
 
-// QR event
 client.on("qr", async (qr) => {
 
     latestQR = await QRCode.toDataURL(qr);
 
-    console.log("===== QR LINK =====");
+    console.log("SCAN QR LINK:");
     console.log(latestQR);
-    console.log("===================");
 
 });
 
 
-// ready event
 client.on("ready", () => {
 
     isReady = true;
@@ -51,8 +50,7 @@ client.on("ready", () => {
 });
 
 
-// status endpoint
-app.get("/", (req, res) => {
+app.get("/", (req,res)=>{
 
     res.json({
         status: isReady ? "connected" : "not_connected",
@@ -62,55 +60,36 @@ app.get("/", (req, res) => {
 });
 
 
-// send endpoint
-app.get("/send", async (req, res) => {
+app.get("/send", async (req,res)=>{
 
-    try {
+    try{
 
-        const token = req.query.token;
-        const number = req.query.to;
-        const message = req.query.msg;
+        if(req.query.token !== API_TOKEN)
+            return res.json({status:false,message:"token salah"});
 
-        if (token !== API_TOKEN)
-            return res.json({ status:false, message:"token salah" });
+        if(!isReady)
+            return res.json({status:false,message:"WA belum login"});
 
-        if (!isReady)
-            return res.json({ status:false, message:"WA belum connect" });
+        const chatId = req.query.to + "@c.us";
 
-        if (!number || !message)
-            return res.json({ status:false, message:"parameter kurang" });
+        await client.sendMessage(chatId, req.query.msg);
 
-        const chatId = number.includes("@")
-            ? number
-            : number + "@c.us";
+        res.json({status:true});
 
-        await client.sendMessage(chatId, message);
+    }catch(e){
 
-        res.json({
-            status:true,
-            message:"terkirim"
-        });
-
-    } catch(e) {
-
-        console.log(e);
-
-        res.json({
-            status:false,
-            error:e.message
-        });
+        res.json({status:false,error:e.message});
 
     }
 
 });
 
 
-// IMPORTANT: Railway port
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+app.listen(PORT, ()=>{
 
-    console.log("API running on port", PORT);
+    console.log("API running on port",PORT);
 
 });
 
