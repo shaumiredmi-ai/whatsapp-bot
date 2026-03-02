@@ -1,6 +1,6 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
 
-const phoneNumber = "6288901808073"; // nomor kamu (format 62...)
+const phoneNumber = "6288901808073"; // wajib pakai tanda kutip buka & tutup
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -11,7 +11,6 @@ const client = new Client({
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
-            "--disable-software-rasterizer",
             "--no-zygote",
             "--single-process"
         ]
@@ -23,17 +22,14 @@ client.on("ready", () => {
 });
 
 client.on("authenticated", () => {
-    console.log("✅ Sudah login");
+    console.log("✅ Login berhasil");
 });
 
 client.on("auth_failure", msg => {
     console.log("❌ Auth gagal:", msg);
 });
 
-client.on("disconnected", () => {
-    console.log("⚠️ Terputus");
-});
-
+console.log("Memulai bot...");
 client.initialize();
 
 setTimeout(async () => {
@@ -47,6 +43,6 @@ setTimeout(async () => {
         console.log("==============================\n");
 
     } catch (err) {
-        console.log("❌ Gagal ambil pairing code:", err.message);
+        console.log("❌ Error pairing:", err.message);
     }
 }, 15000);
