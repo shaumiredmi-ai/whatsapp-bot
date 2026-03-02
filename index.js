@@ -1,106 +1,43 @@
-const { Client, LocalAuth } = require("whatsapp-web.js");
-const QRCode = require("qrcode");
 const express = require("express");
+const { Client, LocalAuth } = require("whatsapp-web.js");
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
-const TOKEN = "ABC123"; // ganti token kamu
-
-console.log("Memulai bot WhatsApp...");
+const TOKEN = "USATB17";
 
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: "./session"
-    }),
+    authStrategy: new LocalAuth(),
     puppeteer: {
-        headless: true,
-        args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--single-process",
-            "--no-zygote"
-        ]
+        headless:true,
+        args:["--no-sandbox"]
     }
 });
 
+client.on("ready", ()=>{
 
-// QR
-client.on("qr", async (qr) => {
-
-    const link = await QRCode.toDataURL(qr);
-
-    console.log("\nSCAN QR:");
-    console.log(link);
+    console.log("BOT READY");
 
 });
 
 
-// READY
-client.on("ready", () => {
-
-    console.log("✅ BOT SIAP DAN TERHUBUNG");
-
-});
-
-
-// AUTO REPLY TEST
-client.on("message_create", async (msg) => {
-
-    if (msg.body.toLowerCase() === "ping") {
-
-        await msg.reply("pong 🟢 bot aktif");
-
-    }
-
-});
-
-
-/*
-================================
-API SEND MESSAGE
-================================
-*/
 app.get("/send", async (req,res)=>{
 
-    const token = req.query.token;
-    const nomor = req.query.to;
-    const pesan = req.query.msg;
+    if(req.query.token !== TOKEN){
 
-    if(token !== TOKEN){
-
-        return res.send("Token salah");
+        return res.send("token salah");
 
     }
 
-    if(!nomor || !pesan){
+    await client.sendMessage(
+        req.query.to+"@c.us",
+        req.query.msg
+    );
 
-        return res.send("Parameter kurang");
-
-    }
-
-    try{
-
-        await client.sendMessage(nomor+"@c.us", pesan);
-
-        res.send("Pesan terkirim");
-
-    }catch(e){
-
-        res.send("Gagal: "+e.message);
-
-    }
+    res.send("ok");
 
 });
 
 
-app.listen(PORT, ()=>{
-
-    console.log("API aktif di port", PORT);
-
-});
-
+app.listen(3000);
 
 client.initialize();
