@@ -26,9 +26,10 @@ client.on("qr", async (qr) => {
 
     const link = await QRCode.toDataURL(qr);
 
-    console.log("\nSCAN QR DARI LINK INI:");
+    console.log("\n=======================");
+    console.log("SCAN QR DARI LINK INI:");
     console.log(link);
-    console.log("");
+    console.log("=======================\n");
 
 });
 
@@ -41,10 +42,9 @@ client.on("ready", async () => {
 });
 
 
-// AUTO REPLY (INI YANG BENAR)
+// AUTO REPLY TEST
 client.on("message_create", async (msg) => {
 
-    // hanya balas pesan dari diri sendiri / chat biasa
     if (msg.body.toLowerCase() === "ping") {
 
         await msg.reply("pong 🟢 bot aktif");
@@ -54,6 +54,40 @@ client.on("message_create", async (msg) => {
     }
 
 });
+
+
+/*
+====================================
+FUNGSI KIRIM PESAN (UNTUK WEBSITE)
+====================================
+*/
+async function kirimPesan(nomor, pesan){
+
+    try{
+
+        const chatId = nomor + "@c.us";
+
+        await client.sendMessage(chatId, pesan);
+
+        console.log("Pesan terkirim ke", nomor);
+
+    }catch(e){
+
+        console.log("Gagal kirim:", e.message);
+
+    }
+
+}
+
+
+// contoh test otomatis saat start
+setTimeout(()=>{
+
+    // ganti nomor kamu
+    // kirimPesan("628xxxxxxxxxx", "Test dari bot");
+
+},15000);
+
 
 
 client.initialize();
