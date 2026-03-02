@@ -3,7 +3,7 @@ const { Client, LocalAuth } = require("whatsapp-web.js");
 
 const app = express();
 
-const TOKEN = "USATB17";
+const TOKEN = "usatb17";
 
 const client = new Client({
     authStrategy: new LocalAuth(),
