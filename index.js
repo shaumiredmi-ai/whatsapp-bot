@@ -1,5 +1,5 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
+const QRCode = require("qrcode");
 
 console.log("Memulai bot...");
 
@@ -18,21 +18,18 @@ const client = new Client({
     }
 });
 
-client.on("qr", (qr) => {
-    console.log("SCAN QR INI:");
-    qrcode.generate(qr, { small: true });
+client.on("qr", async (qr) => {
+    console.log("QR diterima, membuat link...");
+
+    const url = await QRCode.toDataURL(qr);
+
+    console.log("\nBUKA LINK INI DI BROWSER:\n");
+    console.log(url);
+    console.log("\nLalu scan dari WhatsApp HP\n");
 });
 
 client.on("ready", () => {
-    console.log("BOT SIAP DAN TERHUBUNG");
-});
-
-client.on("authenticated", () => {
-    console.log("LOGIN BERHASIL");
-});
-
-client.on("auth_failure", msg => {
-    console.log("LOGIN GAGAL:", msg);
+    console.log("BOT SIAP ✅");
 });
 
 client.initialize();
