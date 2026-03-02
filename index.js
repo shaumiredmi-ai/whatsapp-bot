@@ -1,13 +1,3 @@
-const fs = require("fs");
-
-// reset session jika perlu
-if (process.env.RESET_SESSION === "true") {
-    if (fs.existsSync("./session")) {
-        fs.rmSync("./session", { recursive: true, force: true });
-        console.log("Session lama dihapus");
-    }
-}
-
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const QRCode = require("qrcode");
@@ -15,7 +5,10 @@ const QRCode = require("qrcode");
 const app = express();
 app.use(express.json());
 
-const API_TOKEN = "usatb17"; // ganti bebas sesuai keinginan
+const API_TOKEN = "medanusatb17";
+
+let latestQR = null;
+let isReady = false;
 
 console.log("Memulai WhatsApp bot...");
 
@@ -36,42 +29,29 @@ const client = new Client({
     }
 });
 
-let latestQR = null;
-let isReady = false;
-
 
 // QR event
 client.on("qr", async (qr) => {
 
     latestQR = await QRCode.toDataURL(qr);
 
-    console.log("\n======================");
-    console.log("BUKA LINK INI:");
+    console.log("===== QR LINK =====");
     console.log(latestQR);
-    console.log("======================");
+    console.log("===================");
 
 });
 
 
-// READY
+// ready event
 client.on("ready", () => {
 
     isReady = true;
-    console.log("✅ BOT SIAP DAN TERHUBUNG");
+    console.log("✅ WhatsApp Connected");
 
 });
 
 
-// DISCONNECT
-client.on("disconnected", () => {
-
-    isReady = false;
-    console.log("WA terputus");
-
-});
-
-
-// STATUS API
+// status endpoint
 app.get("/", (req, res) => {
 
     res.json({
@@ -82,47 +62,42 @@ app.get("/", (req, res) => {
 });
 
 
-// SEND MESSAGE API
+// send endpoint
 app.get("/send", async (req, res) => {
-
-    const token = req.query.token;
-    const number = req.query.to;
-    const message = req.query.msg;
-
-    if (token !== API_TOKEN) {
-
-        return res.json({
-            status: false,
-            message: "Token salah"
-        });
-
-    }
-
-    if (!isReady) {
-
-        return res.json({
-            status: false,
-            message: "WhatsApp belum login"
-        });
-
-    }
 
     try {
 
-        const chatId = number + "@c.us";
+        const token = req.query.token;
+        const number = req.query.to;
+        const message = req.query.msg;
+
+        if (token !== API_TOKEN)
+            return res.json({ status:false, message:"token salah" });
+
+        if (!isReady)
+            return res.json({ status:false, message:"WA belum connect" });
+
+        if (!number || !message)
+            return res.json({ status:false, message:"parameter kurang" });
+
+        const chatId = number.includes("@")
+            ? number
+            : number + "@c.us";
 
         await client.sendMessage(chatId, message);
 
         res.json({
-            status: true,
-            message: "Pesan terkirim"
+            status:true,
+            message:"terkirim"
         });
 
-    } catch (err) {
+    } catch(e) {
+
+        console.log(e);
 
         res.json({
-            status: false,
-            error: err.message
+            status:false,
+            error:e.message
         });
 
     }
@@ -130,11 +105,12 @@ app.get("/send", async (req, res) => {
 });
 
 
+// IMPORTANT: Railway port
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
 
-    console.log("API jalan di port", PORT);
+    console.log("API running on port", PORT);
 
 });
 
