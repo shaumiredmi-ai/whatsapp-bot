@@ -21,91 +21,39 @@ const client = new Client({
 });
 
 
-// =======================
-// QR CODE → LINK
-// =======================
+// QR → LINK
 client.on("qr", async (qr) => {
 
-    console.log("QR diterima...");
+    const link = await QRCode.toDataURL(qr);
 
-    try {
-
-        const link = await QRCode.toDataURL(qr);
-
-        console.log("\n==============================");
-        console.log("BUKA LINK INI DI BROWSER:");
-        console.log(link);
-        console.log("==============================\n");
-
-    } catch (err) {
-
-        console.log("Gagal buat QR:", err.message);
-
-    }
+    console.log("\nSCAN QR DARI LINK INI:");
+    console.log(link);
+    console.log("");
 
 });
 
 
-// =======================
 // READY
-// =======================
 client.on("ready", async () => {
 
     console.log("✅ BOT SIAP DAN TERHUBUNG");
 
-    // kirim pesan test ke nomor sendiri
-    const number = "6288901808073@c.us";
-
-    try {
-
-        await client.sendMessage(number, "✅ Bot Railway aktif");
-
-        console.log("Pesan test terkirim");
-
-    } catch {
-
-        console.log("Tidak bisa kirim pesan test");
-
-    }
-
 });
 
 
-// =======================
-// AUTH SUCCESS
-// =======================
-client.on("authenticated", () => {
+// AUTO REPLY (INI YANG BENAR)
+client.on("message_create", async (msg) => {
 
-    console.log("✅ Login sukses");
-
-});
-
-
-// =======================
-// DISCONNECT
-// =======================
-client.on("disconnected", (msg) => {
-
-    console.log("❌ Disconnect:", msg);
-
-});
-
-
-// =======================
-// AUTO REPLY
-// =======================
-client.on("message", async msg => {
-
+    // hanya balas pesan dari diri sendiri / chat biasa
     if (msg.body.toLowerCase() === "ping") {
 
         await msg.reply("pong 🟢 bot aktif");
 
+        console.log("Reply terkirim");
+
     }
 
 });
 
 
-// =======================
-// START
-// =======================
 client.initialize();
