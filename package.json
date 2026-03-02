@@ -1,6 +1,7 @@
 {
   "name": "whatsapp-bot",
   "version": "1.0.0",
+  "description": "WhatsApp bot Railway",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
