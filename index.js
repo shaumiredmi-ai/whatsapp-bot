@@ -1,7 +1,7 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const QRCode = require("qrcode");
 
-console.log("Memulai WhatsApp bot...");
+console.log("Memulai bot...");
 
 const client = new Client({
     authStrategy: new LocalAuth({
@@ -18,31 +18,28 @@ const client = new Client({
     }
 });
 
-// tampilkan QR sebagai LINK gambar
 client.on("qr", async (qr) => {
-    try {
-        const qrLink = await QRCode.toDataURL(qr);
 
-        console.log("\n==============================");
-        console.log("COPY LINK INI KE BROWSER:");
-        console.log(qrLink);
-        console.log("==============================\n");
+    console.log("QR diterima...");
 
-    } catch (err) {
-        console.log("Error membuat QR:", err.message);
-    }
+    const link = await QRCode.toDataURL(qr);
+
+    console.log("\n==============================");
+    console.log("BUKA LINK INI DI BROWSER:");
+    console.log(link);
+    console.log("==============================\n");
 });
 
 client.on("ready", () => {
-    console.log("✅ WhatsApp BOT TERHUBUNG!");
+    console.log("✅ BOT SIAP DAN TERHUBUNG");
 });
 
 client.on("authenticated", () => {
-    console.log("✅ Login berhasil");
+    console.log("✅ Login sukses");
 });
 
-client.on("disconnected", (reason) => {
-    console.log("❌ Terputus:", reason);
+client.on("disconnected", (msg) => {
+    console.log("❌ Disconnect:", msg);
 });
 
 client.initialize();
