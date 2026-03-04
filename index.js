@@ -164,15 +164,28 @@ app.get("/send", async (req,res)=>{
             return res.json({status:false})
 
 
-        /* NORMALIZE NOMOR */
-
-        number = number.replace(/\D/g,"")
-
-        if(number.startsWith("0"))
-            number = "62"+number.slice(1)
-
-
-        const jid = number + "@s.whatsapp.net"
+            /* =============================
+            DETECT GROUP / NOMOR
+            ============================= */
+            
+            let jid
+            
+            if(number.includes("@g.us")){
+            
+                // kirim ke group
+                jid = number
+            
+            }else{
+            
+                // kirim ke nomor
+                number = number.replace(/\D/g,"")
+            
+                if(number.startsWith("0"))
+                    number = "62"+number.slice(1)
+            
+                jid = number + "@s.whatsapp.net"
+            
+            }
 
 
         await sock.sendMessage(jid,{
