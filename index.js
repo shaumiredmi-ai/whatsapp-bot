@@ -6,73 +6,83 @@ const app = express();
 
 const API_TOKEN = "medanusatb17";
 
+let latestQR = null;
 let isReady = false;
-let qrImage = "";
 
-console.log("Starting WhatsApp bot...");
+console.log("Memulai WhatsApp bot...");
 
-/* ==============================
+
+/* =============================
    INIT CLIENT
-============================== */
+============================= */
 
 const client = new Client({
+
     authStrategy: new LocalAuth({
         dataPath: "./session"
     }),
+
     puppeteer: {
         headless: true,
         args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage"
+            "--disable-dev-shm-usage",
+            "--disable-accelerated-2d-canvas",
+            "--disable-gpu",
+            "--no-zygote",
+            "--no-first-run",
+            "--disable-features=site-per-process",
+            "--single-process"
         ]
     }
+
 });
 
 
-/* ==============================
+/* =============================
    QR EVENT
-============================== */
+============================= */
 
 client.on("qr", async (qr) => {
 
-    console.log("QR GENERATED");
+    latestQR = await QRCode.toDataURL(qr);
 
-    qrImage = await QRCode.toDataURL(qr);
+    console.log("QR GENERATED");
 
 });
 
 
-/* ==============================
-   READY
-============================== */
+/* =============================
+   READY EVENT
+============================= */
 
 client.on("ready", () => {
 
-    console.log("WHATSAPP CONNECTED");
-
     isReady = true;
-    qrImage = "";
+    latestQR = null;
+
+    console.log("WhatsApp Connected");
 
 });
 
 
-/* ==============================
+/* =============================
    DISCONNECTED
-============================== */
+============================= */
 
 client.on("disconnected", () => {
 
-    console.log("WA DISCONNECTED");
-
     isReady = false;
+
+    console.log("WA disconnected");
 
 });
 
 
-/* ==============================
-   HOME (QR PAGE)
-============================== */
+/* =============================
+   QR / STATUS PAGE
+============================= */
 
 app.get("/", (req, res) => {
 
@@ -80,11 +90,11 @@ app.get("/", (req, res) => {
 
         res.send("<h2>WhatsApp Connected</h2>");
 
-    } else if (qrImage !== "") {
+    } else if (latestQR) {
 
         res.send(`
         <h2>Scan QR WhatsApp</h2>
-        <img src="${qrImage}" width="300"/>
+        <img src="${latestQR}" width="300"/>
         <p>Refresh jika QR berubah</p>
         `);
 
@@ -97,9 +107,9 @@ app.get("/", (req, res) => {
 });
 
 
-/* ==============================
-   SEND MESSAGE
-============================== */
+/* =============================
+   SEND MESSAGE API
+============================= */
 
 app.get("/send", async (req, res) => {
 
@@ -109,18 +119,19 @@ app.get("/send", async (req, res) => {
             return res.json({ status: false });
 
         if (!isReady)
-            return res.json({ status: false, message: "WA belum connect" });
+            return res.json({ status: false, message: "WA belum login" });
 
         const number = req.query.to;
         const message = req.query.msg;
 
         let chatId = number.includes("@") ? number : number + "@c.us";
 
-        await client.sendMessage(chatId, message);
+        await client.sendMessage(chatId, message, { linkPreview:false });
 
         res.json({ status: true });
 
-    } catch (e) {
+    }
+    catch (e) {
 
         console.log(e);
 
@@ -131,9 +142,9 @@ app.get("/send", async (req, res) => {
 });
 
 
-/* ==============================
-   SERVER
-============================== */
+/* =============================
+   START SERVER
+============================= */
 
 const PORT = process.env.PORT || 3000;
 
@@ -144,8 +155,8 @@ app.listen(PORT, () => {
 });
 
 
-/* ==============================
+/* =============================
    START CLIENT
-============================== */
+============================= */
 
 client.initialize();
