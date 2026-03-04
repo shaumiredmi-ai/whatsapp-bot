@@ -1,12 +1,13 @@
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const QRCode = require("qrcode");   // <-- tambahkan ini
+const QRCode = require("qrcode");
 
 const app = express();
 
 const API_TOKEN = "medanusatb17";
 
 let isReady = false;
+let qrImage = null;
 
 console.log("Starting WhatsApp bot...");
 
@@ -50,7 +51,7 @@ const client = new Client({
 
 
 /* =============================
-   QR
+   QR EVENT
 ============================= */
 
 client.on("qr", async (qr) => {
@@ -61,6 +62,7 @@ client.on("qr", async (qr) => {
 
 });
 
+
 /* =============================
    READY
 ============================= */
@@ -68,30 +70,35 @@ client.on("qr", async (qr) => {
 client.on("ready", async () => {
 
     isReady = true;
+    qrImage = null;
 
     console.log("WhatsApp Connected");
 
     const page = client.pupPage;
 
-    await page.setCacheEnabled(false);
+    if(page){
 
-    await page.setRequestInterception(true);
+        await page.setCacheEnabled(false);
 
-    page.on("request", (req) => {
+        await page.setRequestInterception(true);
 
-        const type = req.resourceType();
+        page.on("request", (req) => {
 
-        if (
-            type === "image" ||
-            type === "media" ||
-            type === "font"
-        ) {
-            req.abort();
-        } else {
-            req.continue();
-        }
+            const type = req.resourceType();
 
-    });
+            if(
+                type === "image" ||
+                type === "media" ||
+                type === "font"
+            ){
+                req.abort();
+            }else{
+                req.continue();
+            }
+
+        });
+
+    }
 
 });
 
@@ -118,7 +125,7 @@ client.on("disconnected", () => {
 
 
 /* =============================
-   STATUS
+   STATUS API
 ============================= */
 
 app.get("/", (req, res) => {
@@ -131,37 +138,60 @@ app.get("/", (req, res) => {
 
 
 /* =============================
+   QR PAGE
+============================= */
+
+app.get("/qr", (req, res) => {
+
+    if(qrImage){
+
+        res.send(`
+        <h2>Scan QR WhatsApp</h2>
+        <img src="${qrImage}" width="300">
+        <p>Refresh jika QR belum muncul</p>
+        `);
+
+    }else{
+
+        res.send("QR belum tersedia atau sudah connect");
+
+    }
+
+});
+
+
+/* =============================
    SEND MESSAGE
 ============================= */
 
 app.get("/send", async (req, res) => {
 
-    try {
+    try{
 
-        if (req.query.token !== API_TOKEN)
-            return res.json({ status:false });
+        if(req.query.token !== API_TOKEN)
+            return res.json({status:false});
 
-        if (!isReady)
-            return res.json({ status:false });
+        if(!isReady)
+            return res.json({status:false,message:"WA belum connect"});
 
         const number = req.query.to;
         const message = req.query.msg;
 
-        if (!number || !message)
-            return res.json({ status:false });
+        if(!number || !message)
+            return res.json({status:false});
 
         let chatId = number.includes("@") ? number : number + "@c.us";
 
         await client.sendMessage(chatId, message);
 
-        res.json({ status:true });
+        res.json({status:true});
 
     }
-    catch (e) {
+    catch(e){
 
         console.log(e);
 
-        res.json({ status:false });
+        res.json({status:false});
 
     }
 
@@ -182,7 +212,7 @@ setInterval(() => {
 
 
 /* =============================
-   SERVER
+   START SERVER
 ============================= */
 
 const PORT = process.env.PORT || 3000;
