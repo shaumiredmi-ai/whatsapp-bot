@@ -1,135 +1,199 @@
-const express = require("express")
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys")
-const P = require("pino")
-const QRCode = require("qrcode")
+const express = require("express");
+const { Client, LocalAuth } = require("whatsapp-web.js");
 
-const app = express()
+const app = express();
 
-const API_TOKEN = "medanusatb17"
+const API_TOKEN = "medanusatb17";
 
-let sock
-let isReady = false
-let qrImage = null
+let isReady = false;
 
+console.log("Starting WhatsApp bot...");
 
-async function startWA(){
+/* =============================
+   INIT CLIENT
+============================= */
 
-const { state, saveCreds } = await useMultiFileAuthState("session")
+const client = new Client({
 
-const { version } = await fetchLatestBaileysVersion()
+    authStrategy: new LocalAuth({
+        dataPath: "./session"
+    }),
 
-sock = makeWASocket({
-version,
-auth: state,
-logger: P({ level:"silent" }),
-browser:["Ubuntu","Chrome","20"]
-})
+    webVersionCache: {
+        type: "none"
+    },
 
-sock.ev.on("creds.update", saveCreds)
+    puppeteer: {
+        headless: true,
+        args: [
 
-sock.ev.on("connection.update", async(update)=>{
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
 
-const { connection, qr, lastDisconnect } = update
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--disable-default-apps",
 
+            "--mute-audio",
+            "--no-first-run",
 
-if(qr){
+            "--disable-features=site-per-process",
 
-console.log("QR GENERATED")
+            "--js-flags=--max-old-space-size=128"
+        ]
+    }
 
-qrImage = await QRCode.toDataURL(qr)
-
-}
-
-
-if(connection==="open"){
-
-console.log("WHATSAPP CONNECTED")
-
-isReady = true
-
-}
+});
 
 
-if(connection==="close"){
+/* =============================
+   QR
+============================= */
 
-isReady = false
+client.on("qr", () => {
 
-console.log("WA DISCONNECTED")
+    console.log("Scan QR di Railway logs atau endpoint /");
 
-const shouldReconnect =
-lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-
-if(shouldReconnect){
-
-setTimeout(startWA,5000)
-
-}
-
-}
-
-})
-
-}
+});
 
 
-/* STATUS */
+/* =============================
+   READY
+============================= */
 
-app.get("/",(req,res)=>{
+client.on("ready", async () => {
 
-res.json({
-status:isReady ? "connected":"not_connected"
-})
+    isReady = true;
 
-})
+    console.log("WhatsApp Connected");
 
+    const page = client.pupPage;
 
-/* QR PAGE */
+    await page.setCacheEnabled(false);
 
-app.get("/qr",(req,res)=>{
+    await page.setRequestInterception(true);
 
-if(qrImage){
+    page.on("request", (req) => {
 
-res.send(`<img src="${qrImage}" width="300">`)
+        const type = req.resourceType();
 
-}else{
+        if (
+            type === "image" ||
+            type === "media" ||
+            type === "font"
+        ) {
+            req.abort();
+        } else {
+            req.continue();
+        }
 
-res.send("QR belum tersedia, refresh halaman")
+    });
 
-}
-
-})
-
-
-/* SEND MESSAGE */
-
-app.get("/send", async(req,res)=>{
-
-try{
-
-if(req.query.token !== API_TOKEN)
-return res.json({status:false})
-
-if(!isReady)
-return res.json({status:false,message:"WA belum connect"})
-
-const jid = req.query.to.replace(/\D/g,"")+"@s.whatsapp.net"
-
-await sock.sendMessage(jid,{text:req.query.msg})
-
-res.json({status:true})
-
-}catch(e){
-
-res.json({status:false,error:e.message})
-
-}
-
-})
+});
 
 
-app.listen(process.env.PORT||3000,()=>{
-console.log("API running")
-})
+/* =============================
+   DISCONNECTED
+============================= */
+
+client.on("disconnected", () => {
+
+    console.log("WA disconnected");
+
+    isReady = false;
+
+    setTimeout(() => {
+
+        console.log("Reconnect...");
+
+        client.initialize();
+
+    }, 10000);
+
+});
 
 
-startWA()
+/* =============================
+   STATUS
+============================= */
+
+app.get("/", (req, res) => {
+
+    res.json({
+        status: isReady ? "connected" : "not_connected"
+    });
+
+});
+
+
+/* =============================
+   SEND MESSAGE
+============================= */
+
+app.get("/send", async (req, res) => {
+
+    try {
+
+        if (req.query.token !== API_TOKEN)
+            return res.json({ status:false });
+
+        if (!isReady)
+            return res.json({ status:false });
+
+        const number = req.query.to;
+        const message = req.query.msg;
+
+        if (!number || !message)
+            return res.json({ status:false });
+
+        let chatId = number.includes("@") ? number : number + "@c.us";
+
+        await client.sendMessage(chatId, message);
+
+        res.json({ status:true });
+
+    }
+    catch (e) {
+
+        console.log(e);
+
+        res.json({ status:false });
+
+    }
+
+});
+
+
+/* =============================
+   MEMORY MONITOR
+============================= */
+
+setInterval(() => {
+
+    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+
+    console.log("RAM:", Math.round(used), "MB");
+
+}, 60000);
+
+
+/* =============================
+   SERVER
+============================= */
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+
+    console.log("API running on port", PORT);
+
+});
+
+
+/* =============================
+   START CLIENT
+============================= */
+
+client.initialize();
