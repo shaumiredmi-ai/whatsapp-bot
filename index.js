@@ -13,7 +13,7 @@ console.log("Memulai WhatsApp bot...");
 
 
 /* =============================
-   INIT CLIENT
+INIT CLIENT
 ============================= */
 
 const client = new Client({
@@ -22,18 +22,30 @@ const client = new Client({
         dataPath: "./session"
     }),
 
+    webVersionCache: {
+        type: "none"
+    },
+
     puppeteer: {
         headless: true,
         args: [
+
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
-            "--disable-accelerated-2d-canvas",
+
             "--disable-gpu",
-            "--no-zygote",
+            "--disable-extensions",
+            "--disable-background-networking",
+            "--disable-sync",
+            "--disable-default-apps",
+
+            "--mute-audio",
             "--no-first-run",
+
             "--disable-features=site-per-process",
-            "--single-process"
+
+            "--js-flags=--max-old-space-size=128"
         ]
     }
 
@@ -41,7 +53,7 @@ const client = new Client({
 
 
 /* =============================
-   QR EVENT
+QR EVENT
 ============================= */
 
 client.on("qr", async (qr) => {
@@ -54,43 +66,73 @@ client.on("qr", async (qr) => {
 
 
 /* =============================
-   READY EVENT
+READY
 ============================= */
 
-client.on("ready", () => {
+client.on("ready", async () => {
 
     isReady = true;
     latestQR = null;
 
     console.log("WhatsApp Connected");
 
+
+    /* BLOCK RESOURCE AGAR RAM KECIL */
+
+    const page = client.pupPage;
+
+    if(page){
+
+        await page.setCacheEnabled(false);
+
+        await page.setRequestInterception(true);
+
+        page.on("request",(req)=>{
+
+            const type = req.resourceType();
+
+            if(
+                type === "image" ||
+                type === "media" ||
+                type === "font" ||
+                type === "stylesheet"
+            ){
+                req.abort();
+            }else{
+                req.continue();
+            }
+
+        });
+
+    }
+
 });
 
 
 /* =============================
-   DISCONNECTED
+DISCONNECTED
 ============================= */
 
 client.on("disconnected", () => {
 
-    isReady = false;
-
     console.log("WA disconnected");
+
+    isReady = false;
 
 });
 
 
 /* =============================
-   QR / STATUS PAGE
+HOME
 ============================= */
 
-app.get("/", (req, res) => {
+app.get("/", (req,res)=>{
 
-    if (isReady) {
+    if(isReady){
 
         res.send("<h2>WhatsApp Connected</h2>");
 
-    } else if (latestQR) {
+    }else if(latestQR){
 
         res.send(`
         <h2>Scan QR WhatsApp</h2>
@@ -98,7 +140,7 @@ app.get("/", (req, res) => {
         <p>Refresh jika QR berubah</p>
         `);
 
-    } else {
+    }else{
 
         res.send("Menunggu QR dibuat... refresh halaman");
 
@@ -108,55 +150,71 @@ app.get("/", (req, res) => {
 
 
 /* =============================
-   SEND MESSAGE API
+SEND MESSAGE
 ============================= */
 
-app.get("/send", async (req, res) => {
+app.get("/send", async(req,res)=>{
 
-    try {
+    try{
 
-        if (req.query.token !== API_TOKEN)
-            return res.json({ status: false });
+        if(req.query.token !== API_TOKEN)
+            return res.json({status:false})
 
-        if (!isReady)
-            return res.json({ status: false, message: "WA belum login" });
+        if(!isReady)
+            return res.json({status:false,message:"WA belum connect"})
 
-        const number = req.query.to;
-        const message = req.query.msg;
+        const number = req.query.to
+        const message = req.query.msg
 
-        let chatId = number.includes("@") ? number : number + "@c.us";
+        if(!number || !message)
+            return res.json({status:false})
 
-        await client.sendMessage(chatId, message, { linkPreview:false });
+        let chatId = number.includes("@") ? number : number+"@c.us"
 
-        res.json({ status: true });
+        await client.sendMessage(chatId,message,{linkPreview:false})
 
-    }
-    catch (e) {
-
-        console.log(e);
-
-        res.json({ status: false });
+        res.json({status:true})
 
     }
+    catch(e){
 
-});
+        console.log(e)
+
+        res.json({status:false})
+
+    }
+
+})
 
 
 /* =============================
-   START SERVER
+RAM MONITOR
 ============================= */
 
-const PORT = process.env.PORT || 3000;
+setInterval(()=>{
 
-app.listen(PORT, () => {
+const used = process.memoryUsage().heapUsed/1024/1024
 
-    console.log("API running on port", PORT);
+console.log("RAM:",Math.round(used),"MB")
 
-});
+},60000)
 
 
 /* =============================
-   START CLIENT
+SERVER
 ============================= */
 
-client.initialize();
+const PORT = process.env.PORT || 3000
+
+app.listen(PORT,()=>{
+
+console.log("API running on port",PORT)
+
+})
+
+
+/* =============================
+START CLIENT
+============================= */
+
+client.initialize()
