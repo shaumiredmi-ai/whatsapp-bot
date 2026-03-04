@@ -1,5 +1,5 @@
 const express = require("express")
-const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys")
 const P = require("pino")
 const QRCode = require("qrcode")
 
@@ -10,6 +10,7 @@ const API_TOKEN = "medanusatb17"
 let sock
 let isReady = false
 let qrImage = null
+
 
 /* =============================
 START WHATSAPP
@@ -22,8 +23,12 @@ const { state, saveCreds } = await useMultiFileAuthState("session")
 sock = makeWASocket({
 
 auth: state,
+
+printQRInTerminal: true,
+
 logger: P({ level:"silent" }),
-browser: ["Railway","Chrome","1.0"]
+
+browser: ["Ubuntu","Chrome","20.0"]
 
 })
 
@@ -31,8 +36,12 @@ sock.ev.on("creds.update", saveCreds)
 
 sock.ev.on("connection.update", async(update)=>{
 
-const { connection, qr } = update
+const { connection, qr, lastDisconnect } = update
 
+
+/* =============================
+QR
+============================= */
 
 if(qr){
 
@@ -43,27 +52,48 @@ qrImage = await QRCode.toDataURL(qr)
 }
 
 
-if(connection==="open"){
+/* =============================
+CONNECTED
+============================= */
+
+if(connection === "open"){
 
 console.log("WHATSAPP CONNECTED")
 
 isReady = true
+
 qrImage = null
 
 }
 
 
-if(connection==="close"){
+/* =============================
+DISCONNECTED
+============================= */
+
+if(connection === "close"){
+
+isReady = false
+
+const shouldReconnect =
+lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
 
 console.log("WA DISCONNECTED")
 
-isReady = false
+if(shouldReconnect){
+
+console.log("RECONNECTING...")
+
+startWA()
+
+}
 
 }
 
 })
 
 }
+
 
 /* =============================
 STATUS
@@ -76,6 +106,7 @@ status:isReady ? "connected":"not_connected"
 })
 
 })
+
 
 /* =============================
 QR PAGE
@@ -94,6 +125,7 @@ res.send("QR belum tersedia")
 }
 
 })
+
 
 /* =============================
 SEND MESSAGE
@@ -122,11 +154,15 @@ res.json({status:true})
 
 console.log(e)
 
-res.json({status:false,error:e.message})
+res.json({
+status:false,
+error:e.message
+})
 
 }
 
 })
+
 
 /* =============================
 SERVER
@@ -139,5 +175,6 @@ app.listen(PORT,()=>{
 console.log("API running on port",PORT)
 
 })
+
 
 startWA()
