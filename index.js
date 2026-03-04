@@ -6,11 +6,10 @@ const app = express();
 
 const API_TOKEN = "medanusatb17";
 
-let latestQR = null;
 let isReady = false;
+let qrImage = null;
 
-console.log("Memulai WhatsApp bot...");
-
+console.log("Starting WhatsApp bot...");
 
 /* =============================
 INIT CLIENT
@@ -34,7 +33,6 @@ const client = new Client({
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
 
-            "--disable-gpu",
             "--disable-extensions",
             "--disable-background-networking",
             "--disable-sync",
@@ -58,9 +56,9 @@ QR EVENT
 
 client.on("qr", async (qr) => {
 
-    latestQR = await QRCode.toDataURL(qr);
-
     console.log("QR GENERATED");
+
+    qrImage = await QRCode.toDataURL(qr);
 
 });
 
@@ -72,39 +70,9 @@ READY
 client.on("ready", async () => {
 
     isReady = true;
-    latestQR = null;
+    qrImage = null;
 
     console.log("WhatsApp Connected");
-
-
-    /* BLOCK RESOURCE AGAR RAM KECIL */
-
-    const page = client.pupPage;
-
-    if(page){
-
-        await page.setCacheEnabled(false);
-
-        await page.setRequestInterception(true);
-
-        page.on("request",(req)=>{
-
-            const type = req.resourceType();
-
-            if(
-                type === "image" ||
-                type === "media" ||
-                type === "font" ||
-                type === "stylesheet"
-            ){
-                req.abort();
-            }else{
-                req.continue();
-            }
-
-        });
-
-    }
 
 });
 
@@ -119,6 +87,14 @@ client.on("disconnected", () => {
 
     isReady = false;
 
+    setTimeout(() => {
+
+        console.log("Reconnect...");
+
+        client.initialize();
+
+    }, 10000);
+
 });
 
 
@@ -130,19 +106,19 @@ app.get("/", (req,res)=>{
 
     if(isReady){
 
-        res.send("<h2>WhatsApp Connected</h2>");
+        res.send("WhatsApp Connected");
 
-    }else if(latestQR){
+    }else if(qrImage){
 
         res.send(`
         <h2>Scan QR WhatsApp</h2>
-        <img src="${latestQR}" width="300"/>
+        <img src="${qrImage}" width="300">
         <p>Refresh jika QR berubah</p>
         `);
 
     }else{
 
-        res.send("Menunggu QR dibuat... refresh halaman");
+        res.send("Loading WhatsApp...");
 
     }
 
@@ -171,7 +147,7 @@ app.get("/send", async(req,res)=>{
 
         let chatId = number.includes("@") ? number : number+"@c.us"
 
-        await client.sendMessage(chatId,message,{linkPreview:false})
+        await client.sendMessage(chatId,message)
 
         res.json({status:true})
 
