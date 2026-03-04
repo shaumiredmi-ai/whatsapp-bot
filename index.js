@@ -1,4 +1,5 @@
 const express = require("express")
+const fs = require("fs")
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys")
 const P = require("pino")
 const QRCode = require("qrcode")
@@ -13,12 +14,21 @@ let qrImage = null
 
 
 /* =============================
+CREATE SESSION FOLDER
+============================= */
+
+if (!fs.existsSync("./session")) {
+    fs.mkdirSync("./session")
+}
+
+
+/* =============================
 START WHATSAPP
 ============================= */
 
 async function startWA(){
 
-    const { state, saveCreds } = await useMultiFileAuthState("session")
+    const { state, saveCreds } = await useMultiFileAuthState("./session")
 
     sock = makeWASocket({
         auth: state,
@@ -71,7 +81,7 @@ async function startWA(){
 
     })
 
-}   // <<< INI PENUTUP FUNCTION YANG TADI HILANG
+}
 
 
 /* =============================
@@ -157,7 +167,7 @@ app.get("/send", async (req,res)=>{
 
 
 /* =============================
-HEALTH CHECK
+RAM MONITOR
 ============================= */
 
 setInterval(()=>{
