@@ -11,7 +11,6 @@ let isReady = false;
 
 console.log("Memulai WhatsApp bot...");
 
-
 /* =============================
    INIT CLIENT
 ============================= */
@@ -34,7 +33,6 @@ const client = new Client({
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
-            "--no-zygote",
 
             "--disable-extensions",
             "--disable-background-networking",
@@ -46,11 +44,13 @@ const client = new Client({
             "--disable-component-update",
             "--disable-domain-reliability",
             "--disable-notifications",
-            "--disable-hang-monitor",
 
             "--mute-audio",
             "--no-first-run",
-            "--disable-features=site-per-process"
+
+            "--disable-features=site-per-process",
+
+            "--js-flags=--max-old-space-size=128"
         ]
     }
 
@@ -65,9 +65,7 @@ client.on("qr", async (qr) => {
 
     latestQR = await QRCode.toDataURL(qr);
 
-    console.log("\n===== SCAN QR INI =====");
-    console.log(latestQR);
-    console.log("=======================\n");
+    console.log("===== SCAN QR =====");
 
 });
 
@@ -83,12 +81,9 @@ client.on("ready", async () => {
 
     console.log("✅ WhatsApp Connected");
 
-
-    /* =============================
-       BLOCK RESOURCE (HEMAT RAM)
-    ============================= */
-
     const page = client.pupPage;
+
+    await page.setCacheEnabled(false);
 
     await page.setRequestInterception(true);
 
@@ -99,7 +94,8 @@ client.on("ready", async () => {
         if (
             type === "image" ||
             type === "media" ||
-            type === "font"
+            type === "font" ||
+            type === "stylesheet"
         ) {
             req.abort();
         } else {
@@ -117,13 +113,12 @@ client.on("ready", async () => {
 
 client.on("disconnected", (msg) => {
 
-    isReady = false;
-
     console.log("❌ WA disconnected:", msg);
 
-    console.log("Reconnect 5 detik...");
+    isReady = false;
 
     setTimeout(() => {
+        console.log("Reconnect...");
         client.initialize();
     }, 5000);
 
@@ -182,32 +177,7 @@ app.get("/send", async (req, res) => {
         else
             chatId = number + "@c.us";
 
-
-        /* =============================
-           SEND MESSAGE + RETRY
-        ============================= */
-
-        try {
-
-            await client.sendMessage(
-                chatId,
-                message,
-                { linkPreview: false }
-            );
-
-        } catch (err) {
-
-            console.log("Retry kirim WA...");
-
-            await new Promise(r => setTimeout(r, 2000));
-
-            await client.sendMessage(
-                chatId,
-                message,
-                { linkPreview: false }
-            );
-
-        }
+        await client.sendMessage(chatId, message, { linkPreview:false });
 
         res.json({
             status: true,
@@ -235,7 +205,9 @@ app.get("/send", async (req, res) => {
 
 setInterval(() => {
 
-    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+    const mem = process.memoryUsage();
+
+    const used = mem.heapUsed / 1024 / 1024;
 
     console.log("Memory:", Math.round(used) + " MB");
 
