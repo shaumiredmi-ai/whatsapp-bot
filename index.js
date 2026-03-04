@@ -1,199 +1,144 @@
-const express = require("express");
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const express = require("express")
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys")
+const P = require("pino")
 
-const app = express();
+const app = express()
 
-const API_TOKEN = "medanusatb17";
+const API_TOKEN = "medanusatb17"
 
-let isReady = false;
-
-console.log("Starting WhatsApp bot...");
-
-/* =============================
-   INIT CLIENT
-============================= */
-
-const client = new Client({
-
-    authStrategy: new LocalAuth({
-        dataPath: "./session"
-    }),
-
-    webVersionCache: {
-        type: "none"
-    },
-
-    puppeteer: {
-        headless: true,
-        args: [
-
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-
-            "--disable-extensions",
-            "--disable-background-networking",
-            "--disable-sync",
-            "--disable-default-apps",
-
-            "--mute-audio",
-            "--no-first-run",
-
-            "--disable-features=site-per-process",
-
-            "--js-flags=--max-old-space-size=128"
-        ]
-    }
-
-});
+let sock = null
+let isReady = false
 
 
 /* =============================
-   QR
+   START WHATSAPP
 ============================= */
 
-client.on("qr", () => {
+async function startWA(){
 
-    console.log("Scan QR di Railway logs atau endpoint /");
+    const { state, saveCreds } = await useMultiFileAuthState("session")
 
-});
+    sock = makeWASocket({
+        auth: state,
+        logger: P({ level: "silent" }),
+        browser: ["RPH Lambaro","Chrome","1.0"]
+    })
 
+    sock.ev.on("creds.update", saveCreds)
 
-/* =============================
-   READY
-============================= */
+    sock.ev.on("connection.update", (update)=>{
 
-client.on("ready", async () => {
+        const { connection, qr, lastDisconnect } = update
 
-    isReady = true;
-
-    console.log("WhatsApp Connected");
-
-    const page = client.pupPage;
-
-    await page.setCacheEnabled(false);
-
-    await page.setRequestInterception(true);
-
-    page.on("request", (req) => {
-
-        const type = req.resourceType();
-
-        if (
-            type === "image" ||
-            type === "media" ||
-            type === "font"
-        ) {
-            req.abort();
-        } else {
-            req.continue();
+        if(qr){
+            console.log("===== SCAN QR =====")
+            console.log(qr)
         }
 
-    });
+        if(connection==="open"){
+            console.log("✅ WhatsApp Connected")
+            isReady = true
+        }
 
-});
+        if(connection==="close"){
 
+            const shouldReconnect =
+            lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
 
-/* =============================
-   DISCONNECTED
-============================= */
+            console.log("WA disconnected")
 
-client.on("disconnected", () => {
+            isReady = false
 
-    console.log("WA disconnected");
+            if(shouldReconnect){
+                startWA()
+            }
+        }
 
-    isReady = false;
+    })
 
-    setTimeout(() => {
-
-        console.log("Reconnect...");
-
-        client.initialize();
-
-    }, 10000);
-
-});
+}
 
 
 /* =============================
-   STATUS
+   API STATUS
 ============================= */
 
-app.get("/", (req, res) => {
+app.get("/", (req,res)=>{
 
     res.json({
-        status: isReady ? "connected" : "not_connected"
-    });
+        status: isReady ? "connected":"not_connected"
+    })
 
-});
+})
 
 
 /* =============================
    SEND MESSAGE
 ============================= */
 
-app.get("/send", async (req, res) => {
+app.get("/send", async (req,res)=>{
 
-    try {
+    try{
 
-        if (req.query.token !== API_TOKEN)
-            return res.json({ status:false });
+        if(req.query.token !== API_TOKEN){
+            return res.json({
+                status:false,
+                message:"token salah"
+            })
+        }
 
-        if (!isReady)
-            return res.json({ status:false });
+        if(!isReady){
+            return res.json({
+                status:false,
+                message:"WA belum connect"
+            })
+        }
 
-        const number = req.query.to;
-        const message = req.query.msg;
+        const number = req.query.to
+        const message = req.query.msg
 
-        if (!number || !message)
-            return res.json({ status:false });
+        if(!number || !message){
+            return res.json({
+                status:false,
+                message:"parameter kurang"
+            })
+        }
 
-        let chatId = number.includes("@") ? number : number + "@c.us";
+        const jid = number.replace(/\D/g,"") + "@s.whatsapp.net"
 
-        await client.sendMessage(chatId, message);
+        await sock.sendMessage(jid,{
+            text: message
+        })
 
-        res.json({ status:true });
+        res.json({
+            status:true,
+            message:"terkirim"
+        })
 
     }
-    catch (e) {
+    catch(e){
 
-        console.log(e);
+        console.log(e)
 
-        res.json({ status:false });
+        res.json({
+            status:false,
+            error:e.message
+        })
 
     }
 
-});
+})
 
 
 /* =============================
-   MEMORY MONITOR
+   START SERVER
 ============================= */
 
-setInterval(() => {
+const PORT = process.env.PORT || 3000
 
-    const used = process.memoryUsage().heapUsed / 1024 / 1024;
-
-    console.log("RAM:", Math.round(used), "MB");
-
-}, 60000);
+app.listen(PORT, ()=>{
+    console.log("API running on port",PORT)
+})
 
 
-/* =============================
-   SERVER
-============================= */
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-
-    console.log("API running on port", PORT);
-
-});
-
-
-/* =============================
-   START CLIENT
-============================= */
-
-client.initialize();
+startWA()
