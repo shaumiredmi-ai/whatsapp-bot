@@ -1,104 +1,82 @@
 const express = require("express")
-const { Client, LocalAuth } = require("whatsapp-web.js")
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys")
+const P = require("pino")
 const QRCode = require("qrcode")
 
 const app = express()
 
 const API_TOKEN = "medanusatb17"
 
+let sock = null
 let isReady = false
 let qrImage = null
 
-console.log("STARTING BOT...")
-
 
 /* =============================
-INIT CLIENT
+START WHATSAPP
 ============================= */
 
-const client = new Client({
+async function startWA(){
 
-    authStrategy: new LocalAuth({
-        dataPath: "./session"
-    }),
+    const { state, saveCreds } = await useMultiFileAuthState("session")
 
-    webVersionCache: { type: "none" },
+    sock = makeWASocket({
 
-    puppeteer:{
-        headless:true,
-        args:[
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-extensions",
-            "--disable-background-networking",
-            "--disable-sync",
-            "--disable-default-apps",
-            "--no-first-run",
-            "--disable-gpu",
-            "--single-process",
-            "--no-zygote"
-        ]
-    }
+        auth: state,
+        logger: P({ level: "silent" }),
+        browser: ["Railway","Chrome","1.0"]
 
-})
+    })
+
+    sock.ev.on("creds.update", saveCreds)
 
 
-/* =============================
-QR EVENT
-============================= */
+    sock.ev.on("connection.update", async(update)=>{
 
-client.on("qr", async qr => {
-
-    console.log("QR GENERATED")
-
-    qrImage = await QRCode.toDataURL(qr)
-
-})
+        const { connection, qr, lastDisconnect } = update
 
 
-/* =============================
-READY
-============================= */
+        if(qr){
 
-client.on("ready", ()=>{
+            console.log("QR GENERATED")
 
-    console.log("WHATSAPP READY")
+            qrImage = await QRCode.toDataURL(qr)
 
-    isReady = true
-    qrImage = null
-
-})
+        }
 
 
-/* =============================
-DISCONNECT
-============================= */
+        if(connection==="open"){
 
-client.on("disconnected",(reason)=>{
+            console.log("WHATSAPP CONNECTED")
 
-    console.log("WA DISCONNECTED:",reason)
+            isReady = true
+            qrImage = null
 
-    isReady = false
-
-    setTimeout(()=>{
-
-        console.log("RESTARTING CLIENT")
-
-        client.initialize()
-
-    },5000)
-
-})
+        }
 
 
-/* =============================
-PING (untuk cek server)
-============================= */
+        if(connection==="close"){
 
-app.get("/ping",(req,res)=>{
-    res.send("OK")
-})
+            isReady = false
+
+            const shouldReconnect =
+            lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+
+            console.log("WA DISCONNECTED")
+
+            if(shouldReconnect){
+
+                console.log("RECONNECTING...")
+
+                startWA()
+
+            }
+
+        }
+
+    })
+
+}
 
 
 /* =============================
@@ -118,7 +96,6 @@ app.get("/",(req,res)=>{
         res.send(`
         <h2>SCAN QR WHATSAPP</h2>
         <img src="${qrImage}" width="300">
-        <p>Refresh jika QR berubah</p>
         `)
 
     }
@@ -141,7 +118,7 @@ app.get("/send", async (req,res)=>{
     try{
 
         if(req.query.token !== API_TOKEN)
-            return res.json({status:false,message:"token salah"})
+            return res.json({status:false})
 
         if(!isReady)
             return res.json({status:false,message:"WA belum connect"})
@@ -150,32 +127,20 @@ app.get("/send", async (req,res)=>{
         const message = req.query.msg
 
         if(!number || !message)
-            return res.json({status:false,message:"parameter kurang"})
+            return res.json({status:false})
 
-
-        /* NORMALIZE NUMBER */
 
         number = number.replace(/\D/g,"")
 
         if(number.startsWith("0"))
             number = "62"+number.slice(1)
 
-        const chatId = number+"@c.us"
+        const jid = number+"@s.whatsapp.net"
 
 
-        /* SEND MESSAGE WITH TIMEOUT */
-
-        await Promise.race([
-
-            client.sendMessage(chatId,message,{
-                linkPreview:false
-            }),
-
-            new Promise((_,reject)=>
-                setTimeout(()=>reject(new Error("timeout")),15000)
-            )
-
-        ])
+        await sock.sendMessage(jid,{
+            text:message
+        })
 
 
         res.json({
@@ -188,8 +153,7 @@ app.get("/send", async (req,res)=>{
         console.log("SEND ERROR:",e)
 
         res.json({
-            status:false,
-            error:e.message
+            status:false
         })
 
     }
@@ -223,8 +187,4 @@ app.listen(PORT,()=>{
 })
 
 
-/* =============================
-START CLIENT
-============================= */
-
-client.initialize()
+startWA()
