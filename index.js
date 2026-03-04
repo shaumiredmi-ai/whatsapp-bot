@@ -1,7 +1,7 @@
 const express = require("express")
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
 const P = require("pino")
-const QRCode = require("qrcode")
+const qrcode = require("qrcode-terminal")
 
 const app = express()
 
@@ -9,11 +9,10 @@ const API_TOKEN = "medanusatb17"
 
 let sock
 let isReady = false
-let qrImage = null
 
-/* ============================= */
-/* START WHATSAPP */
-/* ============================= */
+/* =============================
+START WHATSAPP
+============================= */
 
 async function startWA(){
 
@@ -22,22 +21,27 @@ const { state, saveCreds } = await useMultiFileAuthState("session")
 sock = makeWASocket({
 
 auth: state,
-logger: P({ level:"silent" })
+
+printQRInTerminal: true,
+
+logger: P({ level:"silent" }),
+
+browser: ["Railway","Chrome","1.0"]
 
 })
 
 sock.ev.on("creds.update", saveCreds)
 
-sock.ev.on("connection.update", async(update)=>{
+sock.ev.on("connection.update",(update)=>{
 
 const { connection, qr } = update
 
 
 if(qr){
 
-console.log("QR GENERATED")
+console.log("\nSCAN QR INI\n")
 
-qrImage = await QRCode.toDataURL(qr)
+qrcode.generate(qr,{small:true})
 
 }
 
@@ -47,7 +51,6 @@ if(connection==="open"){
 console.log("WHATSAPP CONNECTED")
 
 isReady = true
-qrImage = null
 
 }
 
@@ -64,9 +67,9 @@ isReady = false
 
 }
 
-/* ============================= */
-/* STATUS */
-/* ============================= */
+/* =============================
+STATUS
+============================= */
 
 app.get("/",(req,res)=>{
 
@@ -76,27 +79,9 @@ status:isReady ? "connected":"not_connected"
 
 })
 
-/* ============================= */
-/* QR PAGE */
-/* ============================= */
-
-app.get("/qr",(req,res)=>{
-
-if(qrImage){
-
-res.send(`<img src="${qrImage}" width="300">`)
-
-}else{
-
-res.send("QR belum tersedia")
-
-}
-
-})
-
-/* ============================= */
-/* SEND MESSAGE */
-/* ============================= */
+/* =============================
+SEND MESSAGE
+============================= */
 
 app.get("/send", async(req,res)=>{
 
@@ -121,18 +106,15 @@ res.json({status:true})
 
 console.log(e)
 
-res.json({
-status:false,
-error:e.message
-})
+res.json({status:false,error:e.message})
 
 }
 
 })
 
-/* ============================= */
-/* SERVER */
-/* ============================= */
+/* =============================
+SERVER
+============================= */
 
 const PORT = process.env.PORT || 3000
 
