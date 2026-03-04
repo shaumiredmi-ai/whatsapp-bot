@@ -9,7 +9,7 @@ const API_TOKEN = "medanusatb17"
 let isReady = false
 let qrImage = null
 
-console.log("Starting WhatsApp bot...")
+console.log("STARTING BOT...")
 
 
 /* =============================
@@ -22,29 +22,22 @@ const client = new Client({
         dataPath: "./session"
     }),
 
-    webVersionCache: {
-        type: "none"
-    },
+    webVersionCache: { type: "none" },
 
-    puppeteer: {
-        headless: true,
-        args: [
-
+    puppeteer:{
+        headless:true,
+        args:[
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
-
             "--disable-extensions",
             "--disable-background-networking",
             "--disable-sync",
             "--disable-default-apps",
-
-            "--mute-audio",
             "--no-first-run",
-
-            "--disable-features=site-per-process",
-
-            "--js-flags=--max-old-space-size=128"
+            "--disable-gpu",
+            "--single-process",
+            "--no-zygote"
         ]
     }
 
@@ -52,10 +45,10 @@ const client = new Client({
 
 
 /* =============================
-QR EVENT
+QR
 ============================= */
 
-client.on("qr", async (qr)=>{
+client.on("qr", async qr => {
 
     console.log("QR GENERATED")
 
@@ -70,41 +63,32 @@ READY
 
 client.on("ready", ()=>{
 
+    console.log("WHATSAPP READY")
+
     isReady = true
     qrImage = null
-
-    console.log("WhatsApp Connected")
 
 })
 
 
 /* =============================
-DISCONNECTED
+DISCONNECT
 ============================= */
 
-client.on("disconnected", ()=>{
+client.on("disconnected",(reason)=>{
 
-    console.log("WA disconnected")
+    console.log("WA DISCONNECTED:",reason)
 
     isReady = false
 
     setTimeout(()=>{
 
-        console.log("Reconnect...")
+        console.log("RESTARTING CLIENT")
 
         client.initialize()
 
-    },10000)
+    },5000)
 
-})
-
-
-/* =============================
-PING
-============================= */
-
-app.get("/ping",(req,res)=>{
-    res.send("SERVER OK")
 })
 
 
@@ -119,18 +103,19 @@ app.get("/",(req,res)=>{
         res.send("WhatsApp Connected")
 
     }
+
     else if(qrImage){
 
         res.send(`
-        <h2>Scan QR WhatsApp</h2>
+        <h2>SCAN QR</h2>
         <img src="${qrImage}" width="300">
-        <p>Refresh jika QR berubah</p>
         `)
 
     }
+
     else{
 
-        res.send("Loading WhatsApp...")
+        res.send("Starting WhatsApp...")
 
     }
 
@@ -141,57 +126,55 @@ app.get("/",(req,res)=>{
 SEND MESSAGE
 ============================= */
 
-app.get("/send", async (req,res)=>{
+app.get("/send",async(req,res)=>{
 
-    console.log("SEND REQUEST:",req.query)
+    console.log("REQUEST:",req.query)
 
     try{
-
-        if(!req.query.token)
-            return res.json({status:false,message:"token kosong"})
 
         if(req.query.token !== API_TOKEN)
             return res.json({status:false,message:"token salah"})
 
+
         if(!isReady)
             return res.json({status:false,message:"WA belum connect"})
 
+
         let number = req.query.to
         const message = req.query.msg
+
 
         if(!number || !message)
             return res.json({status:false,message:"parameter kurang"})
 
 
-        /* NORMALIZE NOMOR */
-
         number = number.replace(/\D/g,"")
 
-        if(number.startsWith("0")){
+        if(number.startsWith("0"))
             number = "62"+number.slice(1)
-        }
+
 
         const chatId = number+"@c.us"
 
         console.log("SEND TO:",chatId)
 
 
-        await client.sendMessage(chatId,message,{
-            linkPreview:false
-        })
+        const result = await client.sendMessage(chatId,message)
+
+        console.log("SENT OK")
 
 
-        return res.json({
+        res.json({
             status:true,
-            to:chatId
+            id:result.id._serialized
         })
 
     }
     catch(e){
 
-        console.log("SEND ERROR:",e)
+        console.log("ERROR:",e)
 
-        return res.json({
+        res.json({
             status:false,
             error:e.message
         })
@@ -202,14 +185,16 @@ app.get("/send", async (req,res)=>{
 
 
 /* =============================
-RAM MONITOR
+HEALTH CHECK
 ============================= */
 
 setInterval(()=>{
 
-    const used = process.memoryUsage().heapUsed/1024/1024
+    console.log("HEALTH CHECK - READY:",isReady)
 
-    console.log("RAM:",Math.round(used),"MB")
+    const mem = process.memoryUsage().heapUsed/1024/1024
+
+    console.log("RAM:",Math.round(mem),"MB")
 
 },60000)
 
@@ -222,13 +207,9 @@ const PORT = process.env.PORT || 3000
 
 app.listen(PORT,()=>{
 
-    console.log("API running on port",PORT)
+    console.log("API RUNNING PORT",PORT)
 
 })
 
-
-/* =============================
-START CLIENT
-============================= */
 
 client.initialize()
