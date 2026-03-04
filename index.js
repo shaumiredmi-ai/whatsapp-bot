@@ -52,12 +52,13 @@ const client = new Client({
    QR
 ============================= */
 
-client.on("qr", () => {
+client.on("qr", async (qr) => {
 
-    console.log("Scan QR di Railway logs atau endpoint /");
+    console.log("QR GENERATED");
+
+    qrImage = await QRCode.toDataURL(qr);
 
 });
-
 
 /* =============================
    READY
