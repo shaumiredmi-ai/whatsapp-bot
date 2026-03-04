@@ -1,15 +1,16 @@
-const express = require("express");
-const { Client, LocalAuth } = require("whatsapp-web.js");
-const QRCode = require("qrcode");
+const express = require("express")
+const { Client, LocalAuth } = require("whatsapp-web.js")
+const QRCode = require("qrcode")
 
-const app = express();
+const app = express()
 
-const API_TOKEN = "medanusatb17";
+const API_TOKEN = "medanusatb17"
 
-let isReady = false;
-let qrImage = null;
+let isReady = false
+let qrImage = null
 
-console.log("Starting WhatsApp bot...");
+console.log("Starting WhatsApp bot...")
+
 
 /* =============================
 INIT CLIENT
@@ -47,93 +48,107 @@ const client = new Client({
         ]
     }
 
-});
+})
 
 
 /* =============================
 QR EVENT
 ============================= */
 
-client.on("qr", async (qr) => {
+client.on("qr", async (qr)=>{
 
-    console.log("QR GENERATED");
+    console.log("QR GENERATED")
 
-    qrImage = await QRCode.toDataURL(qr);
+    qrImage = await QRCode.toDataURL(qr)
 
-});
+})
 
 
 /* =============================
 READY
 ============================= */
 
-client.on("ready", async () => {
+client.on("ready", ()=>{
 
-    isReady = true;
-    qrImage = null;
+    isReady = true
+    qrImage = null
 
-    console.log("WhatsApp Connected");
+    console.log("WhatsApp Connected")
 
-});
+})
 
 
 /* =============================
 DISCONNECTED
 ============================= */
 
-client.on("disconnected", () => {
+client.on("disconnected", ()=>{
 
-    console.log("WA disconnected");
+    console.log("WA disconnected")
 
-    isReady = false;
+    isReady = false
 
-    setTimeout(() => {
+    setTimeout(()=>{
 
-        console.log("Reconnect...");
+        console.log("Reconnect...")
 
-        client.initialize();
+        client.initialize()
 
-    }, 10000);
+    },10000)
 
-});
+})
+
+
+/* =============================
+PING
+============================= */
+
+app.get("/ping",(req,res)=>{
+    res.send("SERVER OK")
+})
 
 
 /* =============================
 HOME
 ============================= */
 
-app.get("/", (req,res)=>{
+app.get("/",(req,res)=>{
 
     if(isReady){
 
-        res.send("WhatsApp Connected");
+        res.send("WhatsApp Connected")
 
-    }else if(qrImage){
+    }
+    else if(qrImage){
 
         res.send(`
         <h2>Scan QR WhatsApp</h2>
         <img src="${qrImage}" width="300">
         <p>Refresh jika QR berubah</p>
-        `);
+        `)
 
-    }else{
+    }
+    else{
 
-        res.send("Loading WhatsApp...");
+        res.send("Loading WhatsApp...")
 
     }
 
-});
+})
 
 
 /* =============================
 SEND MESSAGE
 ============================= */
 
-app.get("/send", async(req,res)=>{
+app.get("/send", async (req,res)=>{
 
-    console.log("SEND REQUEST:",req.query);
+    console.log("SEND REQUEST:",req.query)
 
     try{
+
+        if(!req.query.token)
+            return res.json({status:false,message:"token kosong"})
 
         if(req.query.token !== API_TOKEN)
             return res.json({status:false,message:"token salah"})
@@ -148,30 +163,25 @@ app.get("/send", async(req,res)=>{
             return res.json({status:false,message:"parameter kurang"})
 
 
-        /* =============================
-        NORMALIZE NOMOR
-        ============================= */
+        /* NORMALIZE NOMOR */
 
         number = number.replace(/\D/g,"")
 
         if(number.startsWith("0")){
-            number = "62" + number.slice(1)
+            number = "62"+number.slice(1)
         }
 
-        const chatId = number + "@c.us"
+        const chatId = number+"@c.us"
 
         console.log("SEND TO:",chatId)
 
-
-        /* =============================
-        SEND MESSAGE
-        ============================= */
 
         await client.sendMessage(chatId,message,{
             linkPreview:false
         })
 
-        res.json({
+
+        return res.json({
             status:true,
             to:chatId
         })
@@ -179,9 +189,9 @@ app.get("/send", async(req,res)=>{
     }
     catch(e){
 
-        console.log("ERROR SEND:",e)
+        console.log("SEND ERROR:",e)
 
-        res.json({
+        return res.json({
             status:false,
             error:e.message
         })
@@ -197,9 +207,9 @@ RAM MONITOR
 
 setInterval(()=>{
 
-const used = process.memoryUsage().heapUsed/1024/1024
+    const used = process.memoryUsage().heapUsed/1024/1024
 
-console.log("RAM:",Math.round(used),"MB")
+    console.log("RAM:",Math.round(used),"MB")
 
 },60000)
 
@@ -212,7 +222,7 @@ const PORT = process.env.PORT || 3000
 
 app.listen(PORT,()=>{
 
-console.log("API running on port",PORT)
+    console.log("API running on port",PORT)
 
 })
 
