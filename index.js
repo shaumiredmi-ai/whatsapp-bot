@@ -45,7 +45,7 @@ const client = new Client({
 
 
 /* =============================
-QR
+QR EVENT
 ============================= */
 
 client.on("qr", async qr => {
@@ -93,6 +93,15 @@ client.on("disconnected",(reason)=>{
 
 
 /* =============================
+PING (untuk cek server)
+============================= */
+
+app.get("/ping",(req,res)=>{
+    res.send("OK")
+})
+
+
+/* =============================
 HOME
 ============================= */
 
@@ -107,8 +116,9 @@ app.get("/",(req,res)=>{
     else if(qrImage){
 
         res.send(`
-        <h2>SCAN QR</h2>
+        <h2>SCAN QR WHATSAPP</h2>
         <img src="${qrImage}" width="300">
+        <p>Refresh jika QR berubah</p>
         `)
 
     }
@@ -126,53 +136,56 @@ app.get("/",(req,res)=>{
 SEND MESSAGE
 ============================= */
 
-app.get("/send",async(req,res)=>{
-
-    console.log("REQUEST:",req.query)
+app.get("/send", async (req,res)=>{
 
     try{
 
         if(req.query.token !== API_TOKEN)
             return res.json({status:false,message:"token salah"})
 
-
         if(!isReady)
             return res.json({status:false,message:"WA belum connect"})
-
 
         let number = req.query.to
         const message = req.query.msg
 
-
         if(!number || !message)
             return res.json({status:false,message:"parameter kurang"})
 
+
+        /* NORMALIZE NUMBER */
 
         number = number.replace(/\D/g,"")
 
         if(number.startsWith("0"))
             number = "62"+number.slice(1)
 
-
         const chatId = number+"@c.us"
 
-        console.log("SEND TO:",chatId)
 
+        /* SEND MESSAGE WITH TIMEOUT */
 
-        const result = await client.sendMessage(chatId,message)
+        await Promise.race([
 
-        console.log("SENT OK")
+            client.sendMessage(chatId,message,{
+                linkPreview:false
+            }),
+
+            new Promise((_,reject)=>
+                setTimeout(()=>reject(new Error("timeout")),15000)
+            )
+
+        ])
 
 
         res.json({
-            status:true,
-            id:result.id._serialized
+            status:true
         })
 
     }
     catch(e){
 
-        console.log("ERROR:",e)
+        console.log("SEND ERROR:",e)
 
         res.json({
             status:false,
@@ -190,11 +203,9 @@ HEALTH CHECK
 
 setInterval(()=>{
 
-    console.log("HEALTH CHECK - READY:",isReady)
-
     const mem = process.memoryUsage().heapUsed/1024/1024
 
-    console.log("RAM:",Math.round(mem),"MB")
+    console.log("READY:",isReady,"RAM:",Math.round(mem),"MB")
 
 },60000)
 
@@ -211,5 +222,9 @@ app.listen(PORT,()=>{
 
 })
 
+
+/* =============================
+START CLIENT
+============================= */
 
 client.initialize()
