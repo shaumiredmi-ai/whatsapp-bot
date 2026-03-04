@@ -211,6 +211,73 @@ app.get("/send", async (req,res)=>{
 
 })
 
+/* =============================
+SEND IMAGE
+============================= */
+
+app.get("/send-image", async (req,res)=>{
+
+    try{
+
+        if(req.query.token !== API_TOKEN)
+            return res.json({status:false})
+
+        if(!isReady)
+            return res.json({status:false,message:"WA belum connect"})
+
+        let number = req.query.to
+        const caption = req.query.caption || ""
+        const image = req.query.image
+
+        if(!number || !image)
+            return res.json({status:false})
+
+
+        /* DETECT GROUP / NOMOR */
+
+        let jid
+
+        if(number.includes("@g.us")){
+
+            jid = number
+
+        }else{
+
+            number = number.replace(/\D/g,"")
+
+            if(number.startsWith("0"))
+                number = "62"+number.slice(1)
+
+            jid = number + "@s.whatsapp.net"
+
+        }
+
+
+        console.log("SEND IMAGE TO:", jid)
+
+        await sock.sendMessage(jid,{
+            image: { url: image },
+            caption: caption
+        })
+
+
+        res.json({
+            status:true,
+            to:jid
+        })
+
+    }
+    catch(e){
+
+        console.log("SEND IMAGE ERROR:",e)
+
+        res.json({
+            status:false
+        })
+
+    }
+
+})
 
 /* =============================
 RAM MONITOR
