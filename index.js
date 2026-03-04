@@ -131,32 +131,60 @@ SEND MESSAGE
 
 app.get("/send", async(req,res)=>{
 
+    console.log("SEND REQUEST:",req.query);
+
     try{
 
         if(req.query.token !== API_TOKEN)
-            return res.json({status:false})
+            return res.json({status:false,message:"token salah"})
 
         if(!isReady)
             return res.json({status:false,message:"WA belum connect"})
 
-        const number = req.query.to
+        let number = req.query.to
         const message = req.query.msg
 
         if(!number || !message)
-            return res.json({status:false})
+            return res.json({status:false,message:"parameter kurang"})
 
-        let chatId = number.includes("@") ? number : number+"@c.us"
 
-        await client.sendMessage(chatId,message)
+        /* =============================
+        NORMALIZE NOMOR
+        ============================= */
 
-        res.json({status:true})
+        number = number.replace(/\D/g,"")
+
+        if(number.startsWith("0")){
+            number = "62" + number.slice(1)
+        }
+
+        const chatId = number + "@c.us"
+
+        console.log("SEND TO:",chatId)
+
+
+        /* =============================
+        SEND MESSAGE
+        ============================= */
+
+        await client.sendMessage(chatId,message,{
+            linkPreview:false
+        })
+
+        res.json({
+            status:true,
+            to:chatId
+        })
 
     }
     catch(e){
 
-        console.log(e)
+        console.log("ERROR SEND:",e)
 
-        res.json({status:false})
+        res.json({
+            status:false,
+            error:e.message
+        })
 
     }
 
