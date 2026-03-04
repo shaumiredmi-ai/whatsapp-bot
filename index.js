@@ -23,12 +23,8 @@ const { state, saveCreds } = await useMultiFileAuthState("session")
 sock = makeWASocket({
 
 auth: state,
-
-printQRInTerminal: true,
-
 logger: P({ level:"silent" }),
-
-browser: ["Ubuntu","Chrome","20.0"]
+browser: ["Railway","Chrome","1.0"]
 
 })
 
@@ -40,7 +36,7 @@ const { connection, qr, lastDisconnect } = update
 
 
 /* =============================
-QR
+QR GENERATED
 ============================= */
 
 if(qr){
@@ -56,12 +52,11 @@ qrImage = await QRCode.toDataURL(qr)
 CONNECTED
 ============================= */
 
-if(connection === "open"){
+if(connection==="open"){
 
 console.log("WHATSAPP CONNECTED")
 
 isReady = true
-
 qrImage = null
 
 }
@@ -71,20 +66,22 @@ qrImage = null
 DISCONNECTED
 ============================= */
 
-if(connection === "close"){
+if(connection==="close"){
 
 isReady = false
+
+console.log("WA DISCONNECTED")
 
 const shouldReconnect =
 lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
 
-console.log("WA DISCONNECTED")
-
 if(shouldReconnect){
 
-console.log("RECONNECTING...")
+console.log("RECONNECTING IN 5s...")
 
+setTimeout(()=>{
 startWA()
+},5000)
 
 }
 
@@ -120,7 +117,7 @@ res.send(`<h2>SCAN QR</h2><img src="${qrImage}" width="300">`)
 
 }else{
 
-res.send("QR belum tersedia")
+res.send("QR belum tersedia, refresh halaman")
 
 }
 
@@ -154,10 +151,7 @@ res.json({status:true})
 
 console.log(e)
 
-res.json({
-status:false,
-error:e.message
-})
+res.json({status:false,error:e.message})
 
 }
 
@@ -171,9 +165,7 @@ SERVER
 const PORT = process.env.PORT || 3000
 
 app.listen(PORT,()=>{
-
 console.log("API running on port",PORT)
-
 })
 
 
