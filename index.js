@@ -21,50 +21,57 @@ async function startWA(){
     const { state, saveCreds } = await useMultiFileAuthState("session")
 
     sock = makeWASocket({
-
         auth: state,
         logger: P({ level: "silent" }),
         browser: ["Railway","Chrome","1.0"]
-
     })
 
     sock.ev.on("creds.update", saveCreds)
 
 
-sock.ev.on("connection.update", async (update) => {
+    sock.ev.on("connection.update", async (update)=>{
 
-    const { connection, lastDisconnect, qr } = update
+        const { connection, lastDisconnect, qr } = update
 
-    if (qr) {
-        console.log("QR RECEIVED")
-        qrImage = await QRCode.toDataURL(qr)
-    }
+        if(qr){
 
-    if (connection === "open") {
+            console.log("QR RECEIVED")
 
-        console.log("WHATSAPP CONNECTED")
-        isReady = true
-        qrImage = null
+            qrImage = await QRCode.toDataURL(qr)
 
-    }
-
-    if (connection === "close") {
-
-        isReady = false
-
-        const shouldReconnect =
-            lastDisconnect?.error?.output?.statusCode !== 401
-
-        console.log("WA DISCONNECTED")
-
-        if (shouldReconnect) {
-            console.log("RECONNECTING...")
-            startWA()
         }
 
-    }
+        if(connection === "open"){
 
-})
+            console.log("WHATSAPP CONNECTED")
+
+            isReady = true
+            qrImage = null
+
+        }
+
+        if(connection === "close"){
+
+            isReady = false
+
+            const shouldReconnect =
+                lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+
+            console.log("WA DISCONNECTED")
+
+            if(shouldReconnect){
+
+                console.log("RECONNECTING...")
+
+                startWA()
+
+            }
+
+        }
+
+    })
+
+}   // <<< INI PENUTUP FUNCTION YANG TADI HILANG
 
 
 /* =============================
@@ -127,7 +134,7 @@ app.get("/send", async (req,res)=>{
 
 
         await sock.sendMessage(jid,{
-            text:message
+            text: message
         })
 
 
@@ -174,5 +181,9 @@ app.listen(PORT,()=>{
 
 })
 
+
+/* =============================
+START
+============================= */
 
 startWA()
