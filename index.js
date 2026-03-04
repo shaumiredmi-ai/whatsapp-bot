@@ -11,7 +11,6 @@ let isReady = false;
 
 console.log("Memulai WhatsApp bot...");
 
-
 /* =============================
    INIT CLIENT
 ============================= */
@@ -22,18 +21,33 @@ const client = new Client({
         dataPath: "./session"
     }),
 
+    webVersionCache: {
+        type: "none"
+    },
+
     puppeteer: {
         headless: true,
         args: [
+
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
-            "--disable-accelerated-2d-canvas",
             "--disable-gpu",
             "--no-zygote",
+            "--single-process",
+
+            "--disable-background-networking",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-extensions",
+            "--disable-sync",
+            "--disable-default-apps",
+
+            "--metrics-recording-only",
+            "--mute-audio",
             "--no-first-run",
-            "--disable-features=site-per-process",
-            "--single-process"
+            "--disable-features=site-per-process"
         ]
     }
 
@@ -76,7 +90,14 @@ client.on("ready", () => {
 client.on("disconnected", (msg) => {
 
     isReady = false;
+
     console.log("❌ WA disconnected:", msg);
+
+    console.log("Reconnecting...");
+
+    setTimeout(() => {
+        client.initialize();
+    }, 5000);
 
 });
 
@@ -109,17 +130,14 @@ app.get("/send", async (req, res) => {
                 message: "token salah"
             });
 
-
         if (!isReady)
             return res.json({
                 status: false,
                 message: "WhatsApp belum login"
             });
 
-
         const number = req.query.to;
         const message = req.query.msg;
-
 
         if (!number || !message)
             return res.json({
@@ -127,35 +145,40 @@ app.get("/send", async (req, res) => {
                 message: "parameter kurang"
             });
 
-
-        /* =============================
-           SUPPORT GROUP & NOMOR
-        ============================= */
-
         let chatId;
 
         if (number.includes("@g.us"))
             chatId = number;
-
         else if (number.includes("@c.us"))
             chatId = number;
-
         else
             chatId = number + "@c.us";
 
-
         /* =============================
-           SEND TANPA LINK PREVIEW
+           SEND MESSAGE + RETRY
         ============================= */
 
-        await client.sendMessage(
-            chatId,
-            message,
-            {
-                linkPreview: false
-            }
-        );
+        try {
 
+            await client.sendMessage(
+                chatId,
+                message,
+                { linkPreview: false }
+            );
+
+        } catch (err) {
+
+            console.log("Retry send...", err.message);
+
+            await new Promise(r => setTimeout(r, 2000));
+
+            await client.sendMessage(
+                chatId,
+                message,
+                { linkPreview: false }
+            );
+
+        }
 
         res.json({
             status: true,
@@ -175,6 +198,23 @@ app.get("/send", async (req, res) => {
     }
 
 });
+
+
+/* =============================
+   AUTO CLEAN MEMORY
+============================= */
+
+setInterval(() => {
+
+    if (global.gc) {
+        global.gc();
+    }
+
+    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+
+    console.log("Memory used:", Math.round(used) + " MB");
+
+}, 60000);
 
 
 /* =============================
