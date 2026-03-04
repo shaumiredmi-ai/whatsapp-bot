@@ -1,6 +1,7 @@
 const express = require("express")
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys")
 const P = require("pino")
+const qrcode = require("qrcode-terminal")
 
 const app = express()
 
@@ -30,28 +31,52 @@ async function startWA(){
 
         const { connection, qr, lastDisconnect } = update
 
+
+        /* ===== QR LOGIN ===== */
+
         if(qr){
-            console.log("===== SCAN QR =====")
-            console.log(qr)
+
+            console.log("\n==============================")
+            console.log("SCAN QR DI BAWAH INI")
+            console.log("==============================\n")
+
+            qrcode.generate(qr,{small:true})
+
         }
 
+
+        /* ===== CONNECTED ===== */
+
         if(connection==="open"){
+
             console.log("✅ WhatsApp Connected")
+
             isReady = true
+
         }
+
+
+        /* ===== DISCONNECTED ===== */
 
         if(connection==="close"){
 
             const shouldReconnect =
             lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
 
-            console.log("WA disconnected")
+            console.log("❌ WA disconnected")
 
             isReady = false
 
             if(shouldReconnect){
-                startWA()
+
+                console.log("🔄 Reconnecting...")
+
+                setTimeout(()=>{
+                    startWA()
+                },5000)
+
             }
+
         }
 
     })
@@ -81,27 +106,33 @@ app.get("/send", async (req,res)=>{
     try{
 
         if(req.query.token !== API_TOKEN){
+
             return res.json({
                 status:false,
                 message:"token salah"
             })
+
         }
 
         if(!isReady){
+
             return res.json({
                 status:false,
                 message:"WA belum connect"
             })
+
         }
 
         const number = req.query.to
         const message = req.query.msg
 
         if(!number || !message){
+
             return res.json({
                 status:false,
                 message:"parameter kurang"
             })
+
         }
 
         const jid = number.replace(/\D/g,"") + "@s.whatsapp.net"
@@ -137,7 +168,9 @@ app.get("/send", async (req,res)=>{
 const PORT = process.env.PORT || 3000
 
 app.listen(PORT, ()=>{
-    console.log("API running on port",PORT)
+
+    console.log("🚀 API running on port",PORT)
+
 })
 
 
