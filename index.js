@@ -7,19 +7,25 @@ const app = express()
 
 const API_TOKEN = "medanusatb17"
 
-let sock
+let sock = null
 let isReady = false
 let qrImage = null
 
+
+/* =============================
+START WHATSAPP
+============================= */
 
 async function startWA(){
 
 const { state, saveCreds } = await useMultiFileAuthState("session")
 
 sock = makeWASocket({
+
 auth: state,
 logger: P({ level:"silent" }),
-browser:["Linux","Chrome","20"]
+browser: ["Ubuntu","Chrome","20.0"]
+
 })
 
 sock.ev.on("creds.update", saveCreds)
@@ -27,6 +33,11 @@ sock.ev.on("creds.update", saveCreds)
 sock.ev.on("connection.update", async(update)=>{
 
 const { connection, qr, lastDisconnect } = update
+
+
+/* =============================
+QR
+============================= */
 
 if(qr){
 
@@ -36,15 +47,26 @@ qrImage = await QRCode.toDataURL(qr)
 
 }
 
-if(connection==="open"){
 
-console.log("WA CONNECTED")
+/* =============================
+CONNECTED
+============================= */
+
+if(connection === "open"){
+
+console.log("WHATSAPP CONNECTED")
 
 isReady = true
+qrImage = null
 
 }
 
-if(connection==="close"){
+
+/* =============================
+DISCONNECTED
+============================= */
+
+if(connection === "close"){
 
 isReady = false
 
@@ -55,7 +77,11 @@ console.log("WA DISCONNECTED")
 
 if(shouldReconnect){
 
-setTimeout(startWA,8000)
+console.log("RECONNECTING IN 8s...")
+
+setTimeout(()=>{
+startWA()
+},8000)
 
 }
 
@@ -66,61 +92,92 @@ setTimeout(startWA,8000)
 }
 
 
-/* STATUS */
+/* =============================
+STATUS
+============================= */
 
 app.get("/",(req,res)=>{
+
 res.json({
 status:isReady ? "connected":"not_connected"
 })
+
 })
 
 
-/* QR PAGE */
+/* =============================
+QR PAGE
+============================= */
 
 app.get("/qr",(req,res)=>{
 
 if(qrImage){
 
-res.send(`<img src="${qrImage}" width="300">`)
+res.send(`
+<h2>Scan QR WhatsApp</h2>
+<img src="${qrImage}" width="300">
+`)
 
 }else{
 
-res.send("QR belum tersedia, refresh")
+res.send("QR belum tersedia, refresh halaman")
 
 }
 
 })
 
 
-/* SEND WA */
+/* =============================
+SEND MESSAGE
+============================= */
 
-app.get("/send",async(req,res)=>{
+app.get("/send", async(req,res)=>{
 
 try{
 
 if(req.query.token !== API_TOKEN)
-return res.json({status:false})
+return res.json({status:false,message:"token salah"})
 
 if(!isReady)
 return res.json({status:false,message:"WA belum connect"})
 
-const jid = req.query.to.replace(/\D/g,"")+"@s.whatsapp.net"
+const number = req.query.to
+const message = req.query.msg
 
-await sock.sendMessage(jid,{text:req.query.msg})
+if(!number || !message)
+return res.json({status:false,message:"parameter kurang"})
 
-res.json({status:true})
+const jid = number.replace(/\D/g,"") + "@s.whatsapp.net"
+
+await sock.sendMessage(jid,{text:message})
+
+res.json({
+status:true,
+message:"terkirim"
+})
 
 }catch(e){
 
-res.json({status:false,error:e.message})
+console.log(e)
+
+res.json({
+status:false,
+error:e.message
+})
 
 }
 
 })
 
 
-app.listen(process.env.PORT||3000,()=>{
-console.log("API running")
+/* =============================
+START SERVER
+============================= */
+
+const PORT = process.env.PORT || 3000
+
+app.listen(PORT,()=>{
+console.log("API running on port",PORT)
 })
 
 
