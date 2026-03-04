@@ -1,14 +1,15 @@
 {
-  "name": "whatsapp-bot",
+  "name": "wa-baileys-api",
   "version": "1.0.0",
+  "description": "WhatsApp API using Baileys",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "qrcode": "^1.5.4",
-    "whatsapp-web.js": "^1.24.0",
-    "puppeteer": "^22.0.0"
+    "@whiskeysockets/baileys": "^6.7.7",
+    "express": "^4.19.2",
+    "pino": "^9.0.0",
+    "qrcode": "^1.5.4"
   }
 }
