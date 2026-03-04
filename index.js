@@ -1,15 +1,15 @@
 const express = require("express")
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys")
 const P = require("pino")
-const qrcode = require("qrcode-terminal")
+const QRCode = require("qrcode")
 
 const app = express()
 
 const API_TOKEN = "medanusatb17"
 
-let sock = null
+let sock
 let isReady = false
-
+let qrImage = null
 
 /* =============================
    START WHATSAPP
@@ -17,82 +17,100 @@ let isReady = false
 
 async function startWA(){
 
-    const { state, saveCreds } = await useMultiFileAuthState("session")
+const { state, saveCreds } = await useMultiFileAuthState("session")
 
-    sock = makeWASocket({
-        auth: state,
-        logger: P({ level: "silent" }),
-        browser: ["RPH Lambaro","Chrome","1.0"]
-    })
+sock = makeWASocket({
 
-    sock.ev.on("creds.update", saveCreds)
+auth: state,
+logger: P({ level: "silent" }),
+browser: ["RailwayWA","Chrome","1.0"]
 
-    sock.ev.on("connection.update", (update)=>{
+})
 
-        const { connection, qr, lastDisconnect } = update
+sock.ev.on("creds.update", saveCreds)
 
+sock.ev.on("connection.update", async(update)=>{
 
-        /* ===== QR LOGIN ===== */
-
-        if(qr){
-
-            console.log("\n==============================")
-            console.log("SCAN QR DI BAWAH INI")
-            console.log("==============================\n")
-
-            qrcode.generate(qr,{small:true})
-
-        }
+const { connection, qr, lastDisconnect } = update
 
 
-        /* ===== CONNECTED ===== */
+/* ===== QR ===== */
 
-        if(connection==="open"){
+if(qr){
 
-            console.log("✅ WhatsApp Connected")
+console.log("QR GENERATED")
 
-            isReady = true
-
-        }
-
-
-        /* ===== DISCONNECTED ===== */
-
-        if(connection==="close"){
-
-            const shouldReconnect =
-            lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-
-            console.log("❌ WA disconnected")
-
-            isReady = false
-
-            if(shouldReconnect){
-
-                console.log("🔄 Reconnecting...")
-
-                setTimeout(()=>{
-                    startWA()
-                },5000)
-
-            }
-
-        }
-
-    })
+qrImage = await QRCode.toDataURL(qr)
 
 }
 
 
+/* ===== CONNECTED ===== */
+
+if(connection==="open"){
+
+console.log("✅ WhatsApp Connected")
+
+isReady = true
+qrImage = null
+
+}
+
+
+/* ===== DISCONNECTED ===== */
+
+if(connection==="close"){
+
+isReady = false
+
+const shouldReconnect =
+lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+
+console.log("❌ WA disconnected")
+
+if(shouldReconnect){
+
+console.log("🔄 reconnecting...")
+
+setTimeout(startWA,5000)
+
+}
+
+}
+
+})
+
+}
+
 /* =============================
-   API STATUS
+   HOME
 ============================= */
 
-app.get("/", (req,res)=>{
+app.get("/",(req,res)=>{
 
-    res.json({
-        status: isReady ? "connected":"not_connected"
-    })
+res.send(`
+<h2>WhatsApp Status : ${isReady ? "Connected" : "Not Connected"}</h2>
+<a href="/qr">Lihat QR Login</a>
+`)
+
+})
+
+
+/* =============================
+   QR PAGE
+============================= */
+
+app.get("/qr",(req,res)=>{
+
+if(qrImage){
+
+res.send(`<img src="${qrImage}" width="300">`)
+
+}else{
+
+res.send("QR belum tersedia atau sudah login")
+
+}
 
 })
 
@@ -101,76 +119,44 @@ app.get("/", (req,res)=>{
    SEND MESSAGE
 ============================= */
 
-app.get("/send", async (req,res)=>{
+app.get("/send", async(req,res)=>{
 
-    try{
+try{
 
-        if(req.query.token !== API_TOKEN){
+if(req.query.token !== API_TOKEN)
+return res.json({status:false})
 
-            return res.json({
-                status:false,
-                message:"token salah"
-            })
+if(!isReady)
+return res.json({status:false,message:"WA belum connect"})
 
-        }
+const number = req.query.to
+const message = req.query.msg
 
-        if(!isReady){
+const jid = number.replace(/\D/g,"") + "@s.whatsapp.net"
 
-            return res.json({
-                status:false,
-                message:"WA belum connect"
-            })
+await sock.sendMessage(jid,{ text: message })
 
-        }
+res.json({status:true})
 
-        const number = req.query.to
-        const message = req.query.msg
+}catch(e){
 
-        if(!number || !message){
+console.log(e)
 
-            return res.json({
-                status:false,
-                message:"parameter kurang"
-            })
+res.json({status:false,error:e.message})
 
-        }
-
-        const jid = number.replace(/\D/g,"") + "@s.whatsapp.net"
-
-        await sock.sendMessage(jid,{
-            text: message
-        })
-
-        res.json({
-            status:true,
-            message:"terkirim"
-        })
-
-    }
-    catch(e){
-
-        console.log(e)
-
-        res.json({
-            status:false,
-            error:e.message
-        })
-
-    }
+}
 
 })
 
 
 /* =============================
-   START SERVER
+   SERVER
 ============================= */
 
 const PORT = process.env.PORT || 3000
 
-app.listen(PORT, ()=>{
-
-    console.log("🚀 API running on port",PORT)
-
+app.listen(PORT,()=>{
+console.log("🚀 API running on port",PORT)
 })
 
 
