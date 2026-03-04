@@ -1,7 +1,7 @@
 const express = require("express")
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
 const P = require("pino")
-const qrcode = require("qrcode-terminal")
+const QRCode = require("qrcode")
 
 const app = express()
 
@@ -9,6 +9,7 @@ const API_TOKEN = "medanusatb17"
 
 let sock
 let isReady = false
+let qrImage = null
 
 /* =============================
 START WHATSAPP
@@ -21,27 +22,23 @@ const { state, saveCreds } = await useMultiFileAuthState("session")
 sock = makeWASocket({
 
 auth: state,
-
-printQRInTerminal: true,
-
 logger: P({ level:"silent" }),
-
 browser: ["Railway","Chrome","1.0"]
 
 })
 
 sock.ev.on("creds.update", saveCreds)
 
-sock.ev.on("connection.update",(update)=>{
+sock.ev.on("connection.update", async(update)=>{
 
 const { connection, qr } = update
 
 
 if(qr){
 
-console.log("\nSCAN QR INI\n")
+console.log("QR GENERATED")
 
-qrcode.generate(qr,{small:true})
+qrImage = await QRCode.toDataURL(qr)
 
 }
 
@@ -51,6 +48,7 @@ if(connection==="open"){
 console.log("WHATSAPP CONNECTED")
 
 isReady = true
+qrImage = null
 
 }
 
@@ -76,6 +74,24 @@ app.get("/",(req,res)=>{
 res.json({
 status:isReady ? "connected":"not_connected"
 })
+
+})
+
+/* =============================
+QR PAGE
+============================= */
+
+app.get("/qr",(req,res)=>{
+
+if(qrImage){
+
+res.send(`<h2>SCAN QR</h2><img src="${qrImage}" width="300">`)
+
+}else{
+
+res.send("QR belum tersedia")
+
+}
 
 })
 
