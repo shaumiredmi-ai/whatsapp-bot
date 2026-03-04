@@ -1,6 +1,12 @@
 const express = require("express")
 const fs = require("fs")
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys")
+const {
+default: makeWASocket,
+useMultiFileAuthState,
+DisconnectReason,
+fetchLatestBaileysVersion
+} = require("@whiskeysockets/baileys")
+
 const P = require("pino")
 const QRCode = require("qrcode")
 
@@ -28,12 +34,19 @@ START WHATSAPP
 
 async function startWA(){
 
+    console.log("STARTING WHATSAPP...")
+
     const { state, saveCreds } = await useMultiFileAuthState("./session")
 
+    const { version } = await fetchLatestBaileysVersion()
+
     sock = makeWASocket({
+
+        version,
         auth: state,
         logger: P({ level: "silent" }),
         browser: ["Railway","Chrome","1.0"]
+
     })
 
     sock.ev.on("creds.update", saveCreds)
@@ -43,6 +56,11 @@ async function startWA(){
 
         const { connection, lastDisconnect, qr } = update
 
+
+        /* =============================
+        QR RECEIVED
+        ============================= */
+
         if(qr){
 
             console.log("QR RECEIVED")
@@ -50,6 +68,11 @@ async function startWA(){
             qrImage = await QRCode.toDataURL(qr)
 
         }
+
+
+        /* =============================
+        CONNECTED
+        ============================= */
 
         if(connection === "open"){
 
@@ -60,12 +83,17 @@ async function startWA(){
 
         }
 
+
+        /* =============================
+        DISCONNECTED
+        ============================= */
+
         if(connection === "close"){
 
             isReady = false
 
             const shouldReconnect =
-                lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
+            lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
 
             console.log("WA DISCONNECTED")
 
@@ -101,6 +129,7 @@ app.get("/",(req,res)=>{
         res.send(`
         <h2>SCAN QR WHATSAPP</h2>
         <img src="${qrImage}" width="300">
+        <p>Refresh jika QR berubah</p>
         `)
 
     }
@@ -135,12 +164,15 @@ app.get("/send", async (req,res)=>{
             return res.json({status:false})
 
 
+        /* NORMALIZE NOMOR */
+
         number = number.replace(/\D/g,"")
 
         if(number.startsWith("0"))
             number = "62"+number.slice(1)
 
-        const jid = number+"@s.whatsapp.net"
+
+        const jid = number + "@s.whatsapp.net"
 
 
         await sock.sendMessage(jid,{
@@ -149,7 +181,8 @@ app.get("/send", async (req,res)=>{
 
 
         res.json({
-            status:true
+            status:true,
+            to:jid
         })
 
     }
