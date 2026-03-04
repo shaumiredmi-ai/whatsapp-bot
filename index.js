@@ -1,15 +1,13 @@
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const QRCode = require("qrcode");
 
 const app = express();
 
 const API_TOKEN = "medanusatb17";
 
-let latestQR = null;
 let isReady = false;
 
-console.log("Memulai WhatsApp bot...");
+console.log("Starting WhatsApp bot...");
 
 /* =============================
    INIT CLIENT
@@ -32,18 +30,11 @@ const client = new Client({
             "--no-sandbox",
             "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
-            "--disable-gpu",
 
             "--disable-extensions",
             "--disable-background-networking",
-            "--disable-background-timer-throttling",
-            "--disable-renderer-backgrounding",
             "--disable-sync",
             "--disable-default-apps",
-
-            "--disable-component-update",
-            "--disable-domain-reliability",
-            "--disable-notifications",
 
             "--mute-audio",
             "--no-first-run",
@@ -58,28 +49,25 @@ const client = new Client({
 
 
 /* =============================
-   QR EVENT
+   QR
 ============================= */
 
-client.on("qr", async (qr) => {
+client.on("qr", () => {
 
-    latestQR = await QRCode.toDataURL(qr);
-
-    console.log("===== SCAN QR =====");
+    console.log("Scan QR di Railway logs atau endpoint /");
 
 });
 
 
 /* =============================
-   READY EVENT
+   READY
 ============================= */
 
 client.on("ready", async () => {
 
     isReady = true;
-    latestQR = null;
 
-    console.log("✅ WhatsApp Connected");
+    console.log("WhatsApp Connected");
 
     const page = client.pupPage;
 
@@ -94,8 +82,7 @@ client.on("ready", async () => {
         if (
             type === "image" ||
             type === "media" ||
-            type === "font" ||
-            type === "stylesheet"
+            type === "font"
         ) {
             req.abort();
         } else {
@@ -111,36 +98,38 @@ client.on("ready", async () => {
    DISCONNECTED
 ============================= */
 
-client.on("disconnected", (msg) => {
+client.on("disconnected", () => {
 
-    console.log("❌ WA disconnected:", msg);
+    console.log("WA disconnected");
 
     isReady = false;
 
     setTimeout(() => {
+
         console.log("Reconnect...");
+
         client.initialize();
-    }, 5000);
+
+    }, 10000);
 
 });
 
 
 /* =============================
-   STATUS API
+   STATUS
 ============================= */
 
 app.get("/", (req, res) => {
 
     res.json({
-        status: isReady ? "connected" : "not_connected",
-        qr: latestQR
+        status: isReady ? "connected" : "not_connected"
     });
 
 });
 
 
 /* =============================
-   SEND MESSAGE API
+   SEND MESSAGE
 ============================= */
 
 app.get("/send", async (req, res) => {
@@ -148,51 +137,29 @@ app.get("/send", async (req, res) => {
     try {
 
         if (req.query.token !== API_TOKEN)
-            return res.json({
-                status: false,
-                message: "token salah"
-            });
+            return res.json({ status:false });
 
         if (!isReady)
-            return res.json({
-                status: false,
-                message: "WhatsApp belum login"
-            });
+            return res.json({ status:false });
 
         const number = req.query.to;
         const message = req.query.msg;
 
         if (!number || !message)
-            return res.json({
-                status: false,
-                message: "parameter kurang"
-            });
+            return res.json({ status:false });
 
-        let chatId;
+        let chatId = number.includes("@") ? number : number + "@c.us";
 
-        if (number.includes("@g.us"))
-            chatId = number;
-        else if (number.includes("@c.us"))
-            chatId = number;
-        else
-            chatId = number + "@c.us";
+        await client.sendMessage(chatId, message);
 
-        await client.sendMessage(chatId, message, { linkPreview:false });
-
-        res.json({
-            status: true,
-            message: "terkirim"
-        });
+        res.json({ status:true });
 
     }
     catch (e) {
 
-        console.log("ERROR:", e);
+        console.log(e);
 
-        res.json({
-            status: false,
-            error: e.message
-        });
+        res.json({ status:false });
 
     }
 
@@ -205,17 +172,15 @@ app.get("/send", async (req, res) => {
 
 setInterval(() => {
 
-    const mem = process.memoryUsage();
+    const used = process.memoryUsage().heapUsed / 1024 / 1024;
 
-    const used = mem.heapUsed / 1024 / 1024;
-
-    console.log("Memory:", Math.round(used) + " MB");
+    console.log("RAM:", Math.round(used), "MB");
 
 }, 60000);
 
 
 /* =============================
-   START SERVER
+   SERVER
 ============================= */
 
 const PORT = process.env.PORT || 3000;
