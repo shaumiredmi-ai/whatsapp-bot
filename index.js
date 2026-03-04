@@ -31,52 +31,40 @@ async function startWA(){
     sock.ev.on("creds.update", saveCreds)
 
 
-    sock.ev.on("connection.update", async(update)=>{
+sock.ev.on("connection.update", async (update) => {
 
-        const { connection, qr, lastDisconnect } = update
+    const { connection, lastDisconnect, qr } = update
 
+    if (qr) {
+        console.log("QR RECEIVED")
+        qrImage = await QRCode.toDataURL(qr)
+    }
 
-        if(qr){
+    if (connection === "open") {
 
-            console.log("QR GENERATED")
+        console.log("WHATSAPP CONNECTED")
+        isReady = true
+        qrImage = null
 
-            qrImage = await QRCode.toDataURL(qr)
+    }
 
+    if (connection === "close") {
+
+        isReady = false
+
+        const shouldReconnect =
+            lastDisconnect?.error?.output?.statusCode !== 401
+
+        console.log("WA DISCONNECTED")
+
+        if (shouldReconnect) {
+            console.log("RECONNECTING...")
+            startWA()
         }
 
+    }
 
-        if(connection==="open"){
-
-            console.log("WHATSAPP CONNECTED")
-
-            isReady = true
-            qrImage = null
-
-        }
-
-
-        if(connection==="close"){
-
-            isReady = false
-
-            const shouldReconnect =
-            lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut
-
-            console.log("WA DISCONNECTED")
-
-            if(shouldReconnect){
-
-                console.log("RECONNECTING...")
-
-                startWA()
-
-            }
-
-        }
-
-    })
-
-}
+})
 
 
 /* =============================
