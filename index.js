@@ -1,6 +1,7 @@
 const express = require("express");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const QRCode = require("qrcode");
+const qrcodeTerminal = require("qrcode-terminal");
 
 const app = express();
 
@@ -12,220 +13,222 @@ let qrImage = null;
 console.log("Starting WhatsApp bot...");
 
 /* =============================
-   INIT CLIENT
+INIT CLIENT
 ============================= */
 
 const client = new Client({
 
-    authStrategy: new LocalAuth({
-        dataPath: "./session"
-    }),
+authStrategy: new LocalAuth({
+dataPath: "./session"
+}),
 
-    webVersionCache: {
-        type: "none"
-    },
+webVersionCache: {
+type: "none"
+},
 
-    puppeteer: {
-        headless: true,
-        args: [
+puppeteer: {
+headless: true,
+args: [
 
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
+"--no-sandbox",
+"--disable-setuid-sandbox",
+"--disable-dev-shm-usage",
 
-            "--disable-extensions",
-            "--disable-background-networking",
-            "--disable-sync",
-            "--disable-default-apps",
+"--disable-extensions",
+"--disable-background-networking",
+"--disable-sync",
+"--disable-default-apps",
 
-            "--mute-audio",
-            "--no-first-run",
+"--mute-audio",
+"--no-first-run",
 
-            "--disable-features=site-per-process",
+"--disable-features=site-per-process",
 
-            "--js-flags=--max-old-space-size=128"
-        ]
-    }
+"--js-flags=--max-old-space-size=128"
+]
+}
 
 });
 
 
 /* =============================
-   QR EVENT
+QR EVENT
 ============================= */
 
 client.on("qr", async (qr) => {
 
-    console.log("QR GENERATED");
+console.log("===== SCAN QR =====");
 
-    qrImage = await QRCode.toDataURL(qr);
+/* QR DI TERMINAL */
+qrcodeTerminal.generate(qr,{small:true});
+
+/* QR DI BROWSER */
+qrImage = await QRCode.toDataURL(qr);
 
 });
 
 
 /* =============================
-   READY
+READY
 ============================= */
 
 client.on("ready", async () => {
 
-    isReady = true;
-    qrImage = null;
+isReady = true;
+qrImage = null;
 
-    console.log("WhatsApp Connected");
+console.log("WhatsApp Connected");
 
-    const page = client.pupPage;
+const page = client.pupPage;
 
-    if(page){
+if(page){
 
-        await page.setCacheEnabled(false);
+await page.setCacheEnabled(false);
 
-        await page.setRequestInterception(true);
+await page.setRequestInterception(true);
 
-        page.on("request", (req) => {
+page.on("request",(req)=>{
 
-            const type = req.resourceType();
+const type = req.resourceType();
 
-            if(
-                type === "image" ||
-                type === "media" ||
-                type === "font"
-            ){
-                req.abort();
-            }else{
-                req.continue();
-            }
+if(
+type==="image" ||
+type==="media" ||
+type==="font"
+){
+req.abort();
+}else{
+req.continue();
+}
 
-        });
+});
 
-    }
+}
 
 });
 
 
 /* =============================
-   DISCONNECTED
+DISCONNECTED
 ============================= */
 
-client.on("disconnected", () => {
+client.on("disconnected",()=>{
 
-    console.log("WA disconnected");
+console.log("WA disconnected");
 
-    isReady = false;
+isReady=false;
 
-    setTimeout(() => {
+setTimeout(()=>{
 
-        console.log("Reconnect...");
+console.log("Reconnect...");
 
-        client.initialize();
+client.initialize();
 
-    }, 10000);
+},10000);
 
 });
 
 
 /* =============================
-   STATUS API
+STATUS
 ============================= */
 
-app.get("/", (req, res) => {
+app.get("/",(req,res)=>{
 
-    res.json({
-        status: isReady ? "connected" : "not_connected"
-    });
+res.json({
+status:isReady ? "connected":"not_connected"
+})
 
 });
 
 
 /* =============================
-   QR PAGE
+QR PAGE
 ============================= */
 
-app.get("/qr", (req, res) => {
+app.get("/qr",(req,res)=>{
 
-    if(qrImage){
+if(qrImage){
 
-        res.send(`
-        <h2>Scan QR WhatsApp</h2>
-        <img src="${qrImage}" width="300">
-        <p>Refresh jika QR belum muncul</p>
-        `);
+res.send(`
+<h2>Scan QR WhatsApp</h2>
+<img src="${qrImage}" width="300">
+`)
 
-    }else{
+}else{
 
-        res.send("QR belum tersedia atau sudah connect");
+res.send("QR belum tersedia / sudah connect")
 
-    }
+}
 
 });
 
 
 /* =============================
-   SEND MESSAGE
+SEND MESSAGE
 ============================= */
 
-app.get("/send", async (req, res) => {
+app.get("/send",async(req,res)=>{
 
-    try{
+try{
 
-        if(req.query.token !== API_TOKEN)
-            return res.json({status:false});
+if(req.query.token !== API_TOKEN)
+return res.json({status:false})
 
-        if(!isReady)
-            return res.json({status:false,message:"WA belum connect"});
+if(!isReady)
+return res.json({status:false,message:"WA belum connect"})
 
-        const number = req.query.to;
-        const message = req.query.msg;
+const number=req.query.to
+const message=req.query.msg
 
-        if(!number || !message)
-            return res.json({status:false});
+if(!number || !message)
+return res.json({status:false})
 
-        let chatId = number.includes("@") ? number : number + "@c.us";
+let chatId = number.includes("@") ? number : number+"@c.us"
 
-        await client.sendMessage(chatId, message);
+await client.sendMessage(chatId,message)
 
-        res.json({status:true});
+res.json({status:true})
 
-    }
-    catch(e){
+}catch(e){
 
-        console.log(e);
+console.log(e)
 
-        res.json({status:false});
+res.json({status:false})
 
-    }
+}
 
-});
+})
 
 
 /* =============================
-   MEMORY MONITOR
+RAM MONITOR
 ============================= */
 
-setInterval(() => {
+setInterval(()=>{
 
-    const used = process.memoryUsage().heapUsed / 1024 / 1024;
+const used=process.memoryUsage().heapUsed/1024/1024
 
-    console.log("RAM:", Math.round(used), "MB");
+console.log("RAM:",Math.round(used),"MB")
 
-}, 60000);
+},60000)
 
 
 /* =============================
-   START SERVER
+SERVER
 ============================= */
 
-const PORT = process.env.PORT || 3000;
+const PORT=process.env.PORT||3000
 
-app.listen(PORT, () => {
+app.listen(PORT,()=>{
 
-    console.log("API running on port", PORT);
+console.log("API running on port",PORT)
 
-});
+})
 
 
 /* =============================
-   START CLIENT
+START CLIENT
 ============================= */
 
 client.initialize();
