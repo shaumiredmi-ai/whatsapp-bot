@@ -1,3 +1,7 @@
+if (process.env.BOT_OFF === "true") {
+  console.log("Bot dimatikan");
+  process.exit(0);
+}
 const express = require("express")
 const fs = require("fs")
 const {
